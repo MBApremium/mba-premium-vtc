@@ -9,7 +9,7 @@ const LOGO_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAfQAAAH0CAYAAADL
 // ---------------------------------------------------------------------------
 // EmailJS (envoi réel d'email, sans backend)
 // ---------------------------------------------------------------------------
-const EMAILJS_SERVICE_ID = "service_vtc";
+const EMAILJS_SERVICE_ID = "servicevtc";
 const EMAILJS_TEMPLATE_ID = "template_testvtc";
 const EMAILJS_PUBLIC_KEY = "Z7JdFoaXftq1oU7kf";
 
