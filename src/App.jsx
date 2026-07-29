@@ -63,7 +63,7 @@ function loadJsPDF() {
   return jsPDFReadyPromise;
 }
 
-async function generateOrderPDFBlob({ reference, clientName, clientEmail, pickup, dropoff, modeLabel, distanceKm, durationMin, priceHT, tva, price, reservedAt }) {
+async function generateOrderPDFBlob({ reference, clientName, clientEmail, pickup, dropoff, modeLabel, distanceKm, durationMin, priceHT, tva, price, driverKbis, reservedAt }) {
   const JsPDFClass = await loadJsPDF();
   const doc = new JsPDFClass();
 
@@ -81,6 +81,7 @@ async function generateOrderPDFBlob({ reference, clientName, clientEmail, pickup
   let y = 75;
   const line = (txt) => { doc.text(txt, 20, y); y += 8; };
   line(`Société : MBA Premium`);
+  if (driverKbis) line(`Kbis n° ${driverKbis}`);
   line(`Client : ${clientName || "(non renseigné)"}`);
   line(`Email du client : ${clientEmail}`);
   y += 4;
@@ -103,7 +104,7 @@ async function generateOrderPDFBlob({ reference, clientName, clientEmail, pickup
   return doc.output("blob");
 }
 
-async function generateInvoicePDFBlob({ invoiceNumber, clientName, clientEmail, pickup, dropoff, distanceKm, durationMin, priceHT, tva, price, paymentMethod, paymentStatus, driverName, driverSiret, driverAddress, reservedAt }) {
+async function generateInvoicePDFBlob({ invoiceNumber, clientName, clientEmail, pickup, dropoff, distanceKm, durationMin, priceHT, tva, price, paymentMethod, paymentStatus, driverName, driverSiret, driverKbis, driverAddress, reservedAt }) {
   const JsPDFClass = await loadJsPDF();
   const doc = new JsPDFClass();
 
@@ -124,6 +125,7 @@ async function generateInvoicePDFBlob({ invoiceNumber, clientName, clientEmail, 
   line(`Prestataire : ${driverName || "MBA Premium"}`);
   if (driverAddress) line(driverAddress);
   if (driverSiret) line(`SIRET : ${driverSiret}`);
+  if (driverKbis) line(`Kbis n° ${driverKbis}`);
   y += 4;
   line(`Client : ${clientName || "(non renseigné)"}`);
   line(`Email du client : ${clientEmail || "(non renseigné)"}`);
@@ -144,36 +146,9 @@ async function generateInvoicePDFBlob({ invoiceNumber, clientName, clientEmail, 
   return doc.output("blob");
 }
 
-async function sendRealEmailWithAttachment(subject, message, fileBlob, fileName) {
+async function sendRealEmail(subject, message) {
   const ejs = await loadEmailJS();
-
-  const form = document.createElement("form");
-  form.style.display = "none";
-
-  const subjectInput = document.createElement("input");
-  subjectInput.name = "subject";
-  subjectInput.value = subject;
-  form.appendChild(subjectInput);
-
-  const messageInput = document.createElement("textarea");
-  messageInput.name = "message";
-  messageInput.value = message;
-  form.appendChild(messageInput);
-
-  const fileInput = document.createElement("input");
-  fileInput.type = "file";
-  fileInput.name = "attachment";
-  const dataTransfer = new DataTransfer();
-  dataTransfer.items.add(new File([fileBlob], fileName, { type: "application/pdf" }));
-  fileInput.files = dataTransfer.files;
-  form.appendChild(fileInput);
-
-  document.body.appendChild(form);
-  try {
-    await ejs.sendForm(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, form);
-  } finally {
-    document.body.removeChild(form);
-  }
+  return ejs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, { subject, message });
 }
 
 // ---------------------------------------------------------------------------
@@ -218,7 +193,7 @@ function uid() {
 // ---------------------------------------------------------------------------
 export default function App() {
   const [view, setView] = useState("home"); // home | booking | payment | confirm | history
-  const [driver, setDriver] = useState({ name: "Votre chauffeur", vehicle: "Peugeot 508", plate: "AB-123-CD", rating: 4.9, siret: "", address: "", email: "mbapremiumfr@gmail.com" });
+  const [driver, setDriver] = useState({ name: "Votre chauffeur", vehicle: "Peugeot 508", plate: "AB-123-CD", rating: 4.9, siret: "", kbis: "", address: "", email: "mbapremiumfr@gmail.com" });
   const [trip, setTrip] = useState({ pickup: "", dropoff: "", mode: "later", date: "", time: "", clientName: "" });
   const [estimate, setEstimate] = useState(null);
   const [bookings, setBookings] = useState([]);
@@ -312,25 +287,7 @@ export default function App() {
         `Total TTC : ${formatEUR(record.price)}\n` +
         `Moyen de paiement : ${paymentMethod}\n` +
         `Statut : ${record.paymentStatus}`;
-      const pdfBlob = await generateInvoicePDFBlob({
-        invoiceNumber,
-        clientName: record.clientName,
-        clientEmail,
-        pickup: record.pickup,
-        dropoff: record.dropoff,
-        distanceKm: record.distanceKm,
-        durationMin: record.durationMin,
-        priceHT: record.priceHT,
-        tva: record.tva,
-        price: record.price,
-        paymentMethod,
-        paymentStatus: record.paymentStatus,
-        driverName: driver.name,
-        driverSiret: driver.siret,
-        driverAddress: driver.address,
-        reservedAt,
-      });
-      await sendRealEmailWithAttachment(subject, message, pdfBlob, `facture-${invoiceNumber}.pdf`);
+      await sendRealEmail(subject, message);
     } catch (e) {
       // L'échec de l'envoi ne doit pas bloquer la confirmation de la course.
     }
@@ -686,22 +643,7 @@ function Payment({ trip, estimate, driver, onBack, onPay, onViewOrder }) {
       `→ Envoyez le lien de paiement SumUp (carte bancaire) de ce montant exact à ${clientEmail}.`;
 
     try {
-      const modeLabel = trip.mode === "now" ? "Départ immédiat" : `Planifiée le ${trip.date} à ${trip.time}`;
-      const pdfBlob = await generateOrderPDFBlob({
-        reference,
-        clientName: trip.clientName,
-        clientEmail,
-        pickup: trip.pickup,
-        dropoff: trip.dropoff,
-        modeLabel,
-        distanceKm: estimate.distanceKm,
-        durationMin: estimate.durationMin,
-        priceHT: estimate.priceHT,
-        tva: estimate.tva,
-        price: estimate.price,
-        reservedAt,
-      });
-      await sendRealEmailWithAttachment(subject, message, pdfBlob, `bon-de-commande-${reference}.pdf`);
+      await sendRealEmail(subject, message);
       setSent(true);
     } catch (e) {
       const detail = (e && (e.text || e.message)) ? ` (${e.text || e.message})` : "";
@@ -943,17 +885,74 @@ function HistoryView({ bookings, onHome, onViewInvoice }) {
 // Document (bon de commande / facture)
 // ---------------------------------------------------------------------------
 function Document({ type, booking, driver, onClose }) {
+  const [downloading, setDownloading] = useState(false);
   const isInvoice = type === "invoice";
   const docNumber = isInvoice ? booking.invoiceNumber : "DEVIS-" + hashString(booking.pickup + booking.dropoff).toString(36).toUpperCase().slice(0, 6);
   const docDate = booking.createdAt ? new Date(booking.createdAt) : new Date();
   const docTime = docDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+
+  async function downloadPDF() {
+    setDownloading(true);
+    try {
+      const modeLabel = booking.mode === "now" ? "Départ immédiat" : `Planifiée le ${booking.date} à ${booking.time}`;
+      const blob = isInvoice
+        ? await generateInvoicePDFBlob({
+            invoiceNumber: booking.invoiceNumber,
+            clientName: booking.clientName,
+            clientEmail: booking.clientEmail,
+            pickup: booking.pickup,
+            dropoff: booking.dropoff,
+            distanceKm: booking.distanceKm,
+            durationMin: booking.durationMin,
+            priceHT: booking.priceHT,
+            tva: booking.tva,
+            price: booking.price,
+            paymentMethod: booking.paymentMethod,
+            paymentStatus: booking.paymentStatus,
+            driverName: driver.name,
+            driverSiret: driver.siret,
+            driverKbis: driver.kbis,
+            driverAddress: driver.address,
+            reservedAt: docDate,
+          })
+        : await generateOrderPDFBlob({
+            reference: docNumber,
+            clientName: booking.clientName,
+            clientEmail: booking.clientEmail,
+            pickup: booking.pickup,
+            dropoff: booking.dropoff,
+            modeLabel,
+            distanceKm: booking.distanceKm,
+            durationMin: booking.durationMin,
+            priceHT: booking.priceHT,
+            tva: booking.tva,
+            price: booking.price,
+            driverKbis: driver.kbis,
+            reservedAt: docDate,
+          });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${isInvoice ? "facture" : "bon-de-commande"}-${docNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Erreur génération PDF :", e);
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   return (
     <div className="vtc-doc-wrap">
       <div className="vtc-doc-bar vtc-no-print">
         <button className="vtc-icon-btn" onClick={onClose}><ChevronLeft size={18} /></button>
         <span>{isInvoice ? "Facture" : "Bon de commande"}</span>
-        <button className="vtc-cta vtc-cta-sm" onClick={() => window.print()}>Imprimer / PDF</button>
+        <button className="vtc-cta vtc-cta-sm" disabled={downloading} onClick={downloadPDF}>
+          {downloading ? "Génération…" : "Télécharger le PDF"}
+        </button>
       </div>
 
       <div className="vtc-doc-page">
@@ -973,6 +972,7 @@ function Document({ type, booking, driver, onClose }) {
             <p>Prestataire : {driver.name}</p>
             {driver.address && <p>{driver.address}</p>}
             {driver.siret && <p>SIRET : {driver.siret}</p>}
+            {driver.kbis && <p>Kbis n° {driver.kbis}</p>}
             <p>{driver.vehicle} · {driver.plate}</p>
           </div>
           <div>
@@ -1030,7 +1030,7 @@ function Document({ type, booking, driver, onClose }) {
 
 
 function SettingsModal({ driver, onSave, onClose }) {
-  const [form, setForm] = useState({ siret: "", address: "", email: "", ...driver });
+  const [form, setForm] = useState({ siret: "", kbis: "", address: "", email: "", ...driver });
   return (
     <div className="vtc-modal-backdrop" onClick={onClose}>
       <div className="vtc-modal" onClick={(e) => e.stopPropagation()}>
@@ -1057,6 +1057,10 @@ function SettingsModal({ driver, onSave, onClose }) {
         <div className="vtc-field">
           <label>SIRET (pour la facturation)</label>
           <input placeholder="123 456 789 00012" value={form.siret} onChange={(e) => setForm({ ...form, siret: e.target.value })} />
+        </div>
+        <div className="vtc-field">
+          <label>Numéro de Kbis</label>
+          <input placeholder="Ex. 123 456 789 RCS Paris" value={form.kbis} onChange={(e) => setForm({ ...form, kbis: e.target.value })} />
         </div>
         <div className="vtc-field">
           <label>Adresse professionnelle</label>
