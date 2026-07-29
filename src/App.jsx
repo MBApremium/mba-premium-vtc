@@ -39,9 +39,141 @@ function loadEmailJS() {
   return emailjsReadyPromise;
 }
 
-async function sendRealEmail(subject, message) {
+// ---------------------------------------------------------------------------
+// jsPDF (génération de PDF côté navigateur)
+// ---------------------------------------------------------------------------
+let jsPDFReadyPromise = null;
+function loadJsPDF() {
+  if (jsPDFReadyPromise) return jsPDFReadyPromise;
+  jsPDFReadyPromise = new Promise((resolve, reject) => {
+    if (window.jspdf && window.jspdf.jsPDF) {
+      resolve(window.jspdf.jsPDF);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js";
+    script.async = true;
+    script.onload = () => {
+      if (window.jspdf && window.jspdf.jsPDF) resolve(window.jspdf.jsPDF);
+      else reject(new Error("jsPDF introuvable après chargement"));
+    };
+    script.onerror = () => reject(new Error("Impossible de charger jsPDF"));
+    document.head.appendChild(script);
+  });
+  return jsPDFReadyPromise;
+}
+
+async function generateOrderPDFBlob({ reference, clientName, clientEmail, pickup, dropoff, modeLabel, distanceKm, durationMin, priceHT, tva, price, reservedAt }) {
+  const JsPDFClass = await loadJsPDF();
+  const doc = new JsPDFClass();
+
+  doc.setFontSize(18);
+  doc.text("MBA Premium", 20, 20);
+  doc.setFontSize(11);
+  doc.text("Mindful.Business.Assurance", 20, 27);
+
+  doc.setFontSize(16);
+  doc.text("Bon de commande", 20, 45);
+  doc.setFontSize(11);
+  doc.text(`N° ${reference}`, 20, 53);
+  doc.text(`Réservation effectuée le ${reservedAt.toLocaleDateString("fr-FR")} à ${reservedAt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`, 20, 60);
+
+  let y = 75;
+  const line = (txt) => { doc.text(txt, 20, y); y += 8; };
+  line(`Société : MBA Premium`);
+  line(`Client : ${clientName || "(non renseigné)"}`);
+  line(`Email du client : ${clientEmail}`);
+  y += 4;
+  line(`Départ : ${pickup}`);
+  line(`Arrivée : ${dropoff}`);
+  line(modeLabel);
+  line(`Distance : ${distanceKm} km`);
+  y += 4;
+  doc.setFontSize(11);
+  line(`Total HT (${distanceKm} km × 2,00 €) : ${formatEUR(priceHT)}`);
+  line(`TVA (10%) : ${formatEUR(tva)}`);
+  doc.setFontSize(13);
+  line(`Total TTC : ${formatEUR(price)}`);
+  doc.setFontSize(11);
+  line("Paiement par carte bancaire");
+  doc.setFontSize(9);
+  y += 6;
+  line("Ce document est une estimation et ne constitue pas une facture.");
+
+  return doc.output("blob");
+}
+
+async function generateInvoicePDFBlob({ invoiceNumber, clientName, clientEmail, pickup, dropoff, distanceKm, durationMin, priceHT, tva, price, paymentMethod, paymentStatus, driverName, driverSiret, driverAddress, reservedAt }) {
+  const JsPDFClass = await loadJsPDF();
+  const doc = new JsPDFClass();
+
+  doc.setFontSize(18);
+  doc.text("MBA Premium", 20, 20);
+  doc.setFontSize(11);
+  doc.text("Mindful.Business.Assurance", 20, 27);
+
+  doc.setFontSize(16);
+  doc.text("Facture", 20, 45);
+  doc.setFontSize(11);
+  doc.text(`N° ${invoiceNumber}`, 20, 53);
+  doc.text(`Réservation effectuée le ${reservedAt.toLocaleDateString("fr-FR")} à ${reservedAt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`, 20, 60);
+
+  let y = 75;
+  const line = (txt) => { doc.text(txt, 20, y); y += 8; };
+  line(`Société : MBA Premium`);
+  line(`Prestataire : ${driverName || "MBA Premium"}`);
+  if (driverAddress) line(driverAddress);
+  if (driverSiret) line(`SIRET : ${driverSiret}`);
+  y += 4;
+  line(`Client : ${clientName || "(non renseigné)"}`);
+  line(`Email du client : ${clientEmail || "(non renseigné)"}`);
+  y += 4;
+  line(`Départ : ${pickup}`);
+  line(`Arrivée : ${dropoff}`);
+  line(`Distance : ${distanceKm} km`);
+  y += 4;
+  doc.setFontSize(11);
+  line(`Total HT (${distanceKm} km × 2,00 €) : ${formatEUR(priceHT)}`);
+  line(`TVA (10%) : ${formatEUR(tva)}`);
+  doc.setFontSize(13);
+  line(`Total TTC : ${formatEUR(price)}`);
+  doc.setFontSize(11);
+  line(`Moyen de paiement : ${paymentMethod}`);
+  line(`Statut : ${paymentStatus}`);
+
+  return doc.output("blob");
+}
+
+async function sendRealEmailWithAttachment(subject, message, fileBlob, fileName) {
   const ejs = await loadEmailJS();
-  return ejs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, { subject, message });
+
+  const form = document.createElement("form");
+  form.style.display = "none";
+
+  const subjectInput = document.createElement("input");
+  subjectInput.name = "subject";
+  subjectInput.value = subject;
+  form.appendChild(subjectInput);
+
+  const messageInput = document.createElement("textarea");
+  messageInput.name = "message";
+  messageInput.value = message;
+  form.appendChild(messageInput);
+
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.name = "attachment";
+  const dataTransfer = new DataTransfer();
+  dataTransfer.items.add(new File([fileBlob], fileName, { type: "application/pdf" }));
+  fileInput.files = dataTransfer.files;
+  form.appendChild(fileInput);
+
+  document.body.appendChild(form);
+  try {
+    await ejs.sendForm(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, form);
+  } finally {
+    document.body.removeChild(form);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -60,12 +192,15 @@ function estimateTrip(pickup, dropoff) {
   const seed = hashString((pickup + "|" + dropoff).toLowerCase());
   const distanceKm = 2.5 + (seed % 180) / 10; // 2.5 - 20.5 km
   const durationMin = Math.round(distanceKm * 2.1 + 4);
-  const base = 4.5;
-  const perKm = 1.65;
-  const price = base + distanceKm * perKm;
+  const roundedDistanceKm = Math.round(distanceKm * 10) / 10;
+  const priceHT = roundedDistanceKm * 2;
+  const tva = priceHT * 0.10;
+  const price = priceHT + tva;
   return {
-    distanceKm: Math.round(distanceKm * 10) / 10,
+    distanceKm: roundedDistanceKm,
     durationMin,
+    priceHT: Math.round(priceHT * 100) / 100,
+    tva: Math.round(tva * 100) / 100,
     price: Math.round(price * 100) / 100,
   };
 }
@@ -84,7 +219,7 @@ function uid() {
 export default function App() {
   const [view, setView] = useState("home"); // home | booking | payment | confirm | history
   const [driver, setDriver] = useState({ name: "Votre chauffeur", vehicle: "Peugeot 508", plate: "AB-123-CD", rating: 4.9, siret: "", address: "", email: "mbapremiumfr@gmail.com" });
-  const [trip, setTrip] = useState({ pickup: "", dropoff: "", mode: "now", date: "", time: "", clientName: "" });
+  const [trip, setTrip] = useState({ pickup: "", dropoff: "", mode: "later", date: "", time: "", clientName: "" });
   const [estimate, setEstimate] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [loaded, setLoaded] = useState(false);
@@ -160,20 +295,42 @@ export default function App() {
     await persistBookings(next);
 
     try {
+      const reservedAt = new Date(record.createdAt);
       const subject = `Facture ${invoiceNumber} — ${formatEUR(record.price)}`;
       const message =
         `Paiement confirmé par le client.\n\n` +
         `Facture N° : ${invoiceNumber}\n` +
+        `Société : MBA Premium\n` +
+        `Réservation effectuée le ${reservedAt.toLocaleDateString("fr-FR")} à ${reservedAt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}\n` +
         `Client : ${record.clientName || "(non renseigné)"}\n` +
         `Email du client : ${clientEmail || "(non renseigné)"}\n\n` +
         `Départ : ${record.pickup}\n` +
         `Arrivée : ${record.dropoff}\n` +
-        `Distance : ${record.distanceKm} km · Durée estimée : ${record.durationMin} min\n\n` +
-        `Montant TTC : ${formatEUR(record.price)}\n` +
+        `Distance : ${record.distanceKm} km\n\n` +
+        `Total HT (${record.distanceKm} km × 2,00 €) : ${formatEUR(record.priceHT)}\n` +
+        `TVA (10%) : ${formatEUR(record.tva)}\n` +
+        `Total TTC : ${formatEUR(record.price)}\n` +
         `Moyen de paiement : ${paymentMethod}\n` +
-        `Statut : ${record.paymentStatus}\n\n` +
-        `TVA non applicable, art. 293 B du CGI.`;
-      await sendRealEmail(subject, message);
+        `Statut : ${record.paymentStatus}`;
+      const pdfBlob = await generateInvoicePDFBlob({
+        invoiceNumber,
+        clientName: record.clientName,
+        clientEmail,
+        pickup: record.pickup,
+        dropoff: record.dropoff,
+        distanceKm: record.distanceKm,
+        durationMin: record.durationMin,
+        priceHT: record.priceHT,
+        tva: record.tva,
+        price: record.price,
+        paymentMethod,
+        paymentStatus: record.paymentStatus,
+        driverName: driver.name,
+        driverSiret: driver.siret,
+        driverAddress: driver.address,
+        reservedAt,
+      });
+      await sendRealEmailWithAttachment(subject, message, pdfBlob, `facture-${invoiceNumber}.pdf`);
     } catch (e) {
       // L'échec de l'envoi ne doit pas bloquer la confirmation de la course.
     }
@@ -270,9 +427,9 @@ function Home({ driver, onBook, bookings }) {
         <div className="vtc-hero-copy">
           <img src={LOGO_SRC} alt="MBA Premium" className="vtc-hero-logo" />
           <span className="vtc-eyebrow">Réservation en direct</span>
-          <h1>Votre course, <br />sans détour.</h1>
+          <h1>À l'heure, en toute <br />sécurité. Toujours.</h1>
           <p className="vtc-sub">
-            Réservez {driver.name === "Votre chauffeur" ? "votre chauffeur" : driver.name} pour une course immédiate ou planifiée à l'avance.
+            Réservez {driver.name === "Votre chauffeur" ? "votre chauffeur" : driver.name} à l'avance, en toute tranquillité.
             Prix annoncé avant la course, paiement sécurisé par carte.
           </p>
           <button className="vtc-cta" onClick={onBook}>
@@ -290,7 +447,7 @@ function Home({ driver, onBook, bookings }) {
           </div>
         </div>
 
-        <RouteSignature />
+        <MapCard />
       </section>
 
       {bookings.length > 0 && (
@@ -315,57 +472,93 @@ function Home({ driver, onBook, bookings }) {
   );
 }
 
-// Animated "meter + route" signature element
-function RouteSignature() {
+// Animated "map" signature element — stylized map with a car driving along a route
+function MapCard() {
   const pathRef = useRef(null);
-  const [dash, setDash] = useState(1000);
-  const [meter, setMeter] = useState(0);
+  const [point, setPoint] = useState(null);
 
   useEffect(() => {
-    if (pathRef.current) {
-      const len = pathRef.current.getTotalLength();
-      setDash(len);
+    const path = pathRef.current;
+    if (!path) return;
+    const len = path.getTotalLength();
+    const duration = 5000;
+    let start = null;
+    let raf = null;
+    function step(ts) {
+      if (!start) start = ts;
+      const elapsed = (ts - start) % duration;
+      const progress = elapsed / duration;
+      const p = path.getPointAtLength(len * progress);
+      setPoint({ x: p.x, y: p.y });
+      raf = requestAnimationFrame(step);
     }
-    const t = setInterval(() => {
-      setMeter((m) => (m >= 14.8 ? 0 : m + 0.2));
-    }, 90);
-    return () => clearInterval(t);
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   return (
-    <div className="vtc-route-card">
-      <svg viewBox="0 0 320 220" className="vtc-route-svg">
+    <div className="vtc-map-card">
+      <svg viewBox="0 0 320 220" className="vtc-map-svg">
+        <rect x="0" y="0" width="320" height="220" fill="#EAEAE4" />
+        <path d="M 260 -10 C 305 5, 325 45, 300 75 C 278 52, 258 25, 260 -10 Z" fill="#BEE3F8" />
+
+        <g stroke="#FFFFFF" strokeWidth="11">
+          <line x1="0" y1="60" x2="320" y2="60" />
+          <line x1="0" y1="130" x2="320" y2="130" />
+          <line x1="0" y1="190" x2="320" y2="190" />
+          <line x1="60" y1="0" x2="60" y2="220" />
+          <line x1="150" y1="0" x2="150" y2="220" />
+          <line x1="230" y1="0" x2="230" y2="220" />
+        </g>
+        <g stroke="#DAD9D3" strokeWidth="1">
+          <line x1="0" y1="60" x2="320" y2="60" />
+          <line x1="0" y1="130" x2="320" y2="130" />
+          <line x1="0" y1="190" x2="320" y2="190" />
+          <line x1="60" y1="0" x2="60" y2="220" />
+          <line x1="150" y1="0" x2="150" y2="220" />
+          <line x1="230" y1="0" x2="230" y2="220" />
+        </g>
+
+        <rect x="78" y="78" width="42" height="32" fill="#DFDFD8" rx="3" />
+        <rect x="168" y="16" width="38" height="26" fill="#DFDFD8" rx="3" />
+        <rect x="16" y="98" width="26" height="22" fill="#DFDFD8" rx="3" />
+        <rect x="250" y="150" width="32" height="26" fill="#DFDFD8" rx="3" />
+        <rect x="168" y="150" width="26" height="30" fill="#DFDFD8" rx="3" />
+
         <path
           ref={pathRef}
-          d="M 30 190 C 90 190, 60 90, 130 90 S 220 40, 200 100 S 260 150, 290 40"
-          fill="none"
-          stroke="var(--vtc-border)"
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-        <path
-          d="M 30 190 C 90 190, 60 90, 130 90 S 220 40, 200 100 S 260 150, 290 40"
+          d="M 40 190 L 40 130 L 150 130 L 150 60 L 280 60"
           fill="none"
           stroke="var(--vtc-accent)"
-          strokeWidth="3"
+          strokeWidth="5"
           strokeLinecap="round"
-          strokeDasharray={dash}
-          strokeDashoffset={dash}
-          className="vtc-route-draw"
+          strokeLinejoin="round"
         />
-        <circle cx="30" cy="190" r="6" fill="var(--vtc-text)" />
-        <circle cx="290" cy="40" r="6" fill="var(--vtc-accent)" />
-        <g className="vtc-route-car">
-          <circle cx="0" cy="0" r="10" fill="var(--vtc-accent-2)" />
-          <g transform="translate(-5,-5)">
-            <Car size={10} color="#FFFFFF" />
+
+        <circle cx="40" cy="190" r="7" fill="var(--vtc-text)" />
+        <circle cx="40" cy="190" r="3" fill="#FFFFFF" />
+
+        <g transform="translate(280,60)">
+          <path d="M0,-15 C7,-15 13,-9 13,-2 C13,8 0,18 0,18 C0,18 -13,8 -13,-2 C-13,-9 -7,-15 0,-15 Z" fill="var(--vtc-accent-2)" />
+          <circle cx="0" cy="-2" r="4.5" fill="#FFFFFF" />
+        </g>
+
+        {point && (
+          <g transform={`translate(${point.x},${point.y})`}>
+            <circle r="10" fill="var(--vtc-accent-2)" stroke="#FFFFFF" strokeWidth="2.5" />
+            <g transform="translate(-5,-5)">
+              <Car size={10} color="#FFFFFF" />
+            </g>
           </g>
+        )}
+
+        <g transform="translate(284,146)">
+          <rect width="24" height="48" rx="7" fill="#FFFFFF" stroke="#E2E2DD" />
+          <line x1="6" y1="12" x2="18" y2="12" stroke="#8A8A85" strokeWidth="2" strokeLinecap="round" />
+          <line x1="12" y1="6" x2="12" y2="18" stroke="#8A8A85" strokeWidth="2" strokeLinecap="round" />
+          <line x1="6" y1="36" x2="18" y2="36" stroke="#8A8A85" strokeWidth="2" strokeLinecap="round" />
         </g>
       </svg>
-      <div className="vtc-meter">
-        <span className="vtc-meter-label">Tarif estimé</span>
-        <span className="vtc-meter-value">{meter.toFixed(2)} €</span>
-      </div>
     </div>
   );
 }
@@ -374,7 +567,18 @@ function RouteSignature() {
 // Booking form
 // ---------------------------------------------------------------------------
 function Booking({ trip, setTrip, onBack, onNext }) {
-  const canNext = trip.pickup.trim() && trip.dropoff.trim() && (trip.mode === "now" || (trip.date && trip.time));
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const minLead = new Date(now.getTime() + 60 * 60 * 1000); // maintenant + 1h
+  const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const minLeadDateStr = `${minLead.getFullYear()}-${pad(minLead.getMonth() + 1)}-${pad(minLead.getDate())}`;
+  const minLeadTimeStr = `${pad(minLead.getHours())}:${pad(minLead.getMinutes())}`;
+  const minTimeForSelectedDate = trip.date === minLeadDateStr ? minLeadTimeStr : undefined;
+
+  const chosenDateTime = trip.date && trip.time ? new Date(`${trip.date}T${trip.time}`) : null;
+  const isTimingValid = !!chosenDateTime && chosenDateTime.getTime() >= minLead.getTime();
+
+  const canNext = trip.pickup.trim() && trip.dropoff.trim() && trip.date && trip.time && isTimingValid;
 
   return (
     <div className="vtc-panel">
@@ -411,35 +615,37 @@ function Booking({ trip, setTrip, onBack, onNext }) {
       </div>
 
       <div className="vtc-field">
-        <label><Clock size={14} /> Quand ?</label>
-        <div className="vtc-toggle">
-          <button
-            className={trip.mode === "now" ? "is-active" : ""}
-            onClick={() => setTrip({ ...trip, mode: "now" })}
-          >
-            Maintenant
-          </button>
-          <button
-            className={trip.mode === "later" ? "is-active" : ""}
-            onClick={() => setTrip({ ...trip, mode: "later" })}
-          >
-            Planifier
-          </button>
+        <label><Clock size={14} /> Prise en charge souhaitée</label>
+      </div>
+      <div className="vtc-field-row">
+        <div className="vtc-field">
+          <label><Calendar size={14} /> Date</label>
+          <input
+            type="date"
+            min={todayStr}
+            value={trip.date}
+            onChange={(e) => setTrip({ ...trip, date: e.target.value })}
+          />
+        </div>
+        <div className="vtc-field">
+          <label><Clock size={14} /> Heure</label>
+          <input
+            type="time"
+            min={minTimeForSelectedDate}
+            value={trip.time}
+            onChange={(e) => setTrip({ ...trip, time: e.target.value })}
+          />
         </div>
       </div>
 
-      {trip.mode === "later" && (
-        <div className="vtc-field-row">
-          <div className="vtc-field">
-            <label><Calendar size={14} /> Date</label>
-            <input type="date" value={trip.date} onChange={(e) => setTrip({ ...trip, date: e.target.value })} />
-          </div>
-          <div className="vtc-field">
-            <label><Clock size={14} /> Heure</label>
-            <input type="time" value={trip.time} onChange={(e) => setTrip({ ...trip, time: e.target.value })} />
-          </div>
-        </div>
+      {trip.date && trip.time && !isTimingValid && (
+        <p className="vtc-fineprint" style={{ color: "#c0392b", textAlign: "left", marginTop: -8, marginBottom: 14 }}>
+          La réservation doit être faite au moins 1 heure avant la prise en charge.
+        </p>
       )}
+      <p className="vtc-fineprint" style={{ textAlign: "left", marginTop: -8, marginBottom: 14 }}>
+        Les courses se réservent uniquement à l'avance, au moins 1 heure avant l'heure de prise en charge.
+      </p>
 
       <button className="vtc-cta vtc-cta-block" disabled={!canNext} onClick={onNext}>
         Voir le tarif estimé
@@ -461,21 +667,41 @@ function Payment({ trip, estimate, driver, onBack, onPay, onViewOrder }) {
   async function sendOrderEmail() {
     setSending(true);
     setError("");
+    const reservedAt = new Date();
     const subject = `Bon de commande ${reference} — ${formatEUR(estimate.price)}`;
     const message =
       `Nouvelle demande de course à facturer :\n\n` +
       `Référence : ${reference}\n` +
+      `Société : MBA Premium\n` +
+      `Réservation effectuée le ${reservedAt.toLocaleDateString("fr-FR")} à ${reservedAt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}\n` +
       `Client : ${trip.clientName || "(non renseigné)"}\n` +
       `Email du client : ${clientEmail}\n\n` +
       `Départ : ${trip.pickup}\n` +
       `Arrivée : ${trip.dropoff}\n` +
       `${trip.mode === "now" ? "Départ immédiat" : `Planifiée le ${trip.date} à ${trip.time}`}\n` +
-      `Distance : ${estimate.distanceKm} km · Durée estimée : ${estimate.durationMin} min\n\n` +
-      `MONTANT EXACT À DEMANDER : ${formatEUR(estimate.price)}\n\n` +
-      `→ Envoyez le lien de paiement SumUp de ce montant exact à ${clientEmail}.`;
+      `Distance : ${estimate.distanceKm} km\n\n` +
+      `Total HT (${estimate.distanceKm} km × 2,00 €) : ${formatEUR(estimate.priceHT)}\n` +
+      `TVA (10%) : ${formatEUR(estimate.tva)}\n` +
+      `MONTANT TTC EXACT À DEMANDER : ${formatEUR(estimate.price)}\n\n` +
+      `→ Envoyez le lien de paiement SumUp (carte bancaire) de ce montant exact à ${clientEmail}.`;
 
     try {
-      await sendRealEmail(subject, message);
+      const modeLabel = trip.mode === "now" ? "Départ immédiat" : `Planifiée le ${trip.date} à ${trip.time}`;
+      const pdfBlob = await generateOrderPDFBlob({
+        reference,
+        clientName: trip.clientName,
+        clientEmail,
+        pickup: trip.pickup,
+        dropoff: trip.dropoff,
+        modeLabel,
+        distanceKm: estimate.distanceKm,
+        durationMin: estimate.durationMin,
+        priceHT: estimate.priceHT,
+        tva: estimate.tva,
+        price: estimate.price,
+        reservedAt,
+      });
+      await sendRealEmailWithAttachment(subject, message, pdfBlob, `bon-de-commande-${reference}.pdf`);
       setSent(true);
     } catch (e) {
       const detail = (e && (e.text || e.message)) ? ` (${e.text || e.message})` : "";
@@ -531,14 +757,14 @@ function Payment({ trip, estimate, driver, onBack, onPay, onViewOrder }) {
             <Loader2 size={16} className="vtc-spin" />
             <span>Le bon de commande a été envoyé au chauffeur. Il va vous envoyer un lien de paiement SumUp de {formatEUR(estimate.price)} à {clientEmail}.</span>
           </div>
-          <button className="vtc-cta vtc-cta-block" onClick={() => onPay("SumUp (lien email)", clientEmail)}>
+          <button className="vtc-cta vtc-cta-block" onClick={() => onPay("Carte bancaire (SumUp)", clientEmail)}>
             J'ai payé le lien reçu, confirmer la course
           </button>
         </>
       )}
 
       <p className="vtc-fineprint">
-        Le chauffeur reçoit le bon de commande par email et vous envoie ensuite le lien de paiement du montant exact.
+        Le chauffeur reçoit le bon de commande par email et vous envoie ensuite le lien de paiement sur votre adresse mail saisie.
       </p>
     </div>
   );
@@ -720,6 +946,7 @@ function Document({ type, booking, driver, onClose }) {
   const isInvoice = type === "invoice";
   const docNumber = isInvoice ? booking.invoiceNumber : "DEVIS-" + hashString(booking.pickup + booking.dropoff).toString(36).toUpperCase().slice(0, 6);
   const docDate = booking.createdAt ? new Date(booking.createdAt) : new Date();
+  const docTime = docDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
   return (
     <div className="vtc-doc-wrap">
@@ -735,14 +962,15 @@ function Document({ type, booking, driver, onClose }) {
           <div className="vtc-doc-head-right">
             <h2>{isInvoice ? "Facture" : "Bon de commande"}</h2>
             <div>N° {docNumber}</div>
-            <div>{docDate.toLocaleDateString("fr-FR")}</div>
+            <div>Réservation effectuée le {docDate.toLocaleDateString("fr-FR")} à {docTime}</div>
           </div>
         </div>
 
         <div className="vtc-doc-parties">
           <div>
-            <span className="vtc-doc-label">Prestataire</span>
-            <p>{driver.name}</p>
+            <span className="vtc-doc-label">Société</span>
+            <p>MBA Premium</p>
+            <p>Prestataire : {driver.name}</p>
             {driver.address && <p>{driver.address}</p>}
             {driver.siret && <p>SIRET : {driver.siret}</p>}
             <p>{driver.vehicle} · {driver.plate}</p>
@@ -768,28 +996,31 @@ function Document({ type, booking, driver, onClose }) {
               <td>
                 {booking.pickup} → {booking.dropoff}
                 <br />
-                {booking.distanceKm} km · ~{booking.durationMin} min
+                {booking.distanceKm} km × 2,00 €
                 {booking.mode === "later" && booking.date ? ` · ${booking.date} ${booking.time}` : ""}
               </td>
-              <td>{formatEUR(booking.price)}</td>
+              <td>{formatEUR(booking.priceHT)}</td>
+            </tr>
+            <tr>
+              <td colSpan={2}>TVA (10%)</td>
+              <td>{formatEUR(booking.tva)}</td>
             </tr>
           </tbody>
         </table>
 
         <div className="vtc-doc-total">
-          <span>Total {isInvoice ? "TTC" : "estimé"}</span>
+          <span>Total {isInvoice ? "TTC" : "estimé TTC"}</span>
           <strong>{formatEUR(booking.price)}</strong>
         </div>
 
         {isInvoice && (
           <div className="vtc-doc-foot">
-            <p>TVA non applicable, art. 293 B du CGI.</p>
-            <p>Moyen de paiement : {booking.paymentMethod} — Statut : {booking.paymentStatus}</p>
+            <p>Paiement par carte bancaire — Moyen : {booking.paymentMethod} — Statut : {booking.paymentStatus}</p>
           </div>
         )}
         {!isInvoice && (
           <div className="vtc-doc-foot">
-            <p>Ce document est une estimation et ne constitue pas une facture. La facture définitive sera émise après la course.</p>
+            <p>Paiement par carte bancaire. Ce document est une estimation et ne constitue pas une facture. La facture définitive sera émise après la course.</p>
           </div>
         )}
       </div>
@@ -920,20 +1151,9 @@ function Style() {
       .vtc-driver-meta { color: var(--vtc-text-muted); font-size: 12.5px; display: flex; align-items: center; gap: 4px; margin-top: 2px; }
       .vtc-star { color: var(--vtc-accent); fill: var(--vtc-accent); }
 
-      .vtc-route-card { background: var(--vtc-surface); border: 1px solid var(--vtc-border); border-radius: 16px; padding: 18px; position: relative; }
+      .vtc-map-card { border: 1px solid var(--vtc-border); border-radius: 16px; overflow: hidden; position: relative; box-shadow: 0 8px 24px rgba(11,42,74,0.08); }
+      .vtc-map-svg { width: 100%; height: auto; display: block; }
       .vtc-route-svg { width: 100%; height: auto; }
-      .vtc-route-draw { animation: vtc-draw 2.4s ease forwards; }
-      @keyframes vtc-draw { to { stroke-dashoffset: 0; } }
-      .vtc-route-car { animation: vtc-drive 2.4s ease forwards; }
-      @keyframes vtc-drive {
-        0% { transform: translate(30px, 190px); }
-        30% { transform: translate(130px, 90px); }
-        60% { transform: translate(200px, 100px); }
-        100% { transform: translate(290px, 40px); }
-      }
-      .vtc-meter { display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px; padding-top: 12px; border-top: 1px dashed var(--vtc-border); }
-      .vtc-meter-label { font-size: 12px; color: var(--vtc-text-muted); }
-      .vtc-meter-value { font-family: 'IBM Plex Mono', monospace; font-size: 20px; color: var(--vtc-accent-2); font-weight: 500; }
 
       .vtc-track-card { background: var(--vtc-surface); border: 1px solid var(--vtc-border); border-radius: 16px; padding: 18px; margin-bottom: 16px; }
       .vtc-track-status { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
