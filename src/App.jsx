@@ -63,7 +63,7 @@ function loadJsPDF() {
   return jsPDFReadyPromise;
 }
 
-async function generateOrderPDFBlob({ reference, clientName, clientEmail, pickup, dropoff, modeLabel, distanceKm, durationMin, priceHT, tva, price, driverKbis, reservedAt }) {
+async function generateOrderPDFBlob({ courseNumber, clientName, clientEmail, pickup, dropoff, modeLabel, distanceKm, durationMin, priceHT, tva, price, driverKbis, reservedAt }) {
   const JsPDFClass = await loadJsPDF();
   const doc = new JsPDFClass();
 
@@ -75,7 +75,7 @@ async function generateOrderPDFBlob({ reference, clientName, clientEmail, pickup
   doc.setFontSize(16);
   doc.text("Bon de commande", 20, 45);
   doc.setFontSize(11);
-  doc.text(`N° ${reference}`, 20, 53);
+  doc.text(`N° ${courseNumber}`, 20, 53);
   doc.text(`Réservation effectuée le ${reservedAt.toLocaleDateString("fr-FR")} à ${reservedAt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`, 20, 60);
 
   let y = 75;
@@ -104,7 +104,7 @@ async function generateOrderPDFBlob({ reference, clientName, clientEmail, pickup
   return doc.output("blob");
 }
 
-async function generateInvoicePDFBlob({ invoiceNumber, clientName, clientEmail, pickup, dropoff, distanceKm, durationMin, priceHT, tva, price, paymentMethod, paymentStatus, driverName, driverSiret, driverKbis, driverAddress, reservedAt }) {
+async function generateInvoicePDFBlob({ courseNumber, clientName, clientEmail, pickup, dropoff, distanceKm, durationMin, priceHT, tva, price, paymentMethod, paymentStatus, driverName, driverSiret, driverKbis, driverAddress, reservedAt }) {
   const JsPDFClass = await loadJsPDF();
   const doc = new JsPDFClass();
 
@@ -116,7 +116,7 @@ async function generateInvoicePDFBlob({ invoiceNumber, clientName, clientEmail, 
   doc.setFontSize(16);
   doc.text("Facture", 20, 45);
   doc.setFontSize(11);
-  doc.text(`N° ${invoiceNumber}`, 20, 53);
+  doc.text(`N° ${courseNumber}`, 20, 53);
   doc.text(`Réservation effectuée le ${reservedAt.toLocaleDateString("fr-FR")} à ${reservedAt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`, 20, 60);
 
   let y = 75;
@@ -192,10 +192,12 @@ function uid() {
 // Root component
 // ---------------------------------------------------------------------------
 export default function App() {
-  const [view, setView] = useState("home"); // home | booking | payment | confirm | history
+  const [view, setView] = useState("home"); // home | booking | payment | confirm | history | lookup
   const [driver, setDriver] = useState({ name: "Votre chauffeur", vehicle: "Peugeot 508", plate: "AB-123-CD", rating: 4.9, siret: "", kbis: "", address: "", email: "mbapremiumfr@gmail.com" });
   const [trip, setTrip] = useState({ pickup: "", dropoff: "", mode: "later", date: "", time: "", clientName: "" });
   const [estimate, setEstimate] = useState(null);
+  const [courseNumber, setCourseNumber] = useState("");
+  const [currentRecordId, setCurrentRecordId] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -225,6 +227,7 @@ export default function App() {
   async function persistBookings(next) {
     setBookings(next);
     try { await window.storage.set("bookings", JSON.stringify(next)); } catch (e) {}
+    return next;
   }
 
   function goBooking() {
@@ -232,49 +235,57 @@ export default function App() {
     setView("booking");
   }
 
-  function confirmEstimate() {
-    const est = estimateTrip(trip.pickup, trip.dropoff);
-    setEstimate(est);
-    setView("payment");
-  }
-
-  async function nextInvoiceNumber() {
+  async function nextCourseNumber() {
     let n = 1;
     try {
-      const r = await window.storage.get("invoice-seq");
+      const r = await window.storage.get("course-seq");
       if (r && r.value) n = parseInt(r.value, 10) + 1;
     } catch (e) {}
-    try { await window.storage.set("invoice-seq", String(n)); } catch (e) {}
+    try { await window.storage.set("course-seq", String(n)); } catch (e) {}
     const year = new Date().getFullYear();
-    return `F${year}-${String(n).padStart(4, "0")}`;
+    return `COURSE-${year}-${String(n).padStart(4, "0")}`;
   }
 
-  async function completePayment(paymentMethod, clientEmail) {
-    const invoiceNumber = await nextInvoiceNumber();
+  // Génère le numéro de course et crée le bon de commande (persisté dès cette étape)
+  async function goToPayment() {
+    const est = estimateTrip(trip.pickup, trip.dropoff);
+    const number = await nextCourseNumber();
     const record = {
       id: uid(),
+      courseNumber: number,
       pickup: trip.pickup,
       dropoff: trip.dropoff,
       mode: trip.mode,
       date: trip.date,
       time: trip.time,
       clientName: trip.clientName,
-      clientEmail,
-      ...estimate,
-      paymentMethod,
-      paymentStatus: "en attente de vérification",
-      invoiceNumber,
+      clientEmail: "",
+      ...est,
+      paymentMethod: "",
+      paymentStatus: "Bon de commande émis",
       createdAt: new Date().toISOString(),
     };
-    const next = [record, ...bookings].slice(0, 30);
+    const next = [record, ...bookings].slice(0, 60);
     await persistBookings(next);
+    setEstimate(est);
+    setCourseNumber(number);
+    setCurrentRecordId(record.id);
+    setView("payment");
+  }
+
+  async function completePayment(paymentMethod, clientEmail) {
+    const updatedFields = { clientEmail, paymentMethod, paymentStatus: "en attente de vérification" };
+    const next = bookings.map((b) => (b.id === currentRecordId ? { ...b, ...updatedFields } : b));
+    await persistBookings(next);
+    const record = next.find((b) => b.id === currentRecordId);
+    if (!record) return;
 
     try {
       const reservedAt = new Date(record.createdAt);
-      const subject = `Facture ${invoiceNumber} — ${formatEUR(record.price)}`;
+      const subject = `Facture ${record.courseNumber} — ${formatEUR(record.price)}`;
       const message =
         `Paiement confirmé par le client.\n\n` +
-        `Facture N° : ${invoiceNumber}\n` +
+        `Numéro de course : ${record.courseNumber}\n` +
         `Société : MBA Premium\n` +
         `Réservation effectuée le ${reservedAt.toLocaleDateString("fr-FR")} à ${reservedAt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}\n` +
         `Client : ${record.clientName || "(non renseigné)"}\n` +
@@ -299,21 +310,21 @@ export default function App() {
   return (
     <div className="vtc-root">
       <Style />
-      <TopBar view={view} setView={setView} onSettings={() => setShowSettings(true)} driver={driver} />
+      <TopBar view={view} setView={setView} onSettings={() => setShowSettings(true)} onLookup={() => setView("lookup")} driver={driver} />
 
       <main className="vtc-main">
         {view === "home" && <Home driver={driver} onBook={goBooking} bookings={bookings} />}
         {view === "booking" && (
-          <Booking trip={trip} setTrip={setTrip} onBack={() => setView("home")} onNext={confirmEstimate} />
+          <Booking trip={trip} setTrip={setTrip} onBack={() => setView("home")} onNext={goToPayment} />
         )}
         {view === "payment" && estimate && (
           <Payment
             trip={trip}
             estimate={estimate}
-            driver={driver}
+            courseNumber={courseNumber}
             onBack={() => setView("booking")}
             onPay={completePayment}
-            onViewOrder={() => setDocTarget({ type: "order", booking: { ...trip, ...estimate } })}
+            onViewOrder={() => setDocTarget({ type: "order", booking: bookings.find((b) => b.id === currentRecordId) })}
           />
         )}
         {view === "tracking" && lastBooking && (
@@ -331,6 +342,14 @@ export default function App() {
           <HistoryView
             bookings={bookings}
             onHome={() => setView("home")}
+            onViewInvoice={(b) => setDocTarget({ type: "invoice", booking: b })}
+          />
+        )}
+        {view === "lookup" && (
+          <Lookup
+            bookings={bookings}
+            onHome={() => setView("home")}
+            onViewOrder={(b) => setDocTarget({ type: "order", booking: b })}
             onViewInvoice={(b) => setDocTarget({ type: "invoice", booking: b })}
           />
         )}
@@ -352,7 +371,7 @@ export default function App() {
 // ---------------------------------------------------------------------------
 // Top bar
 // ---------------------------------------------------------------------------
-function TopBar({ view, setView, onSettings, driver }) {
+function TopBar({ view, setView, onSettings, onLookup, driver }) {
   return (
     <header className="vtc-topbar">
       <div className="vtc-brand" onClick={() => setView("home")}>
@@ -362,15 +381,22 @@ function TopBar({ view, setView, onSettings, driver }) {
           <small>Mindful.Business.Assurance</small>
         </div>
       </div>
-      <nav className="vtc-nav">
-        <button className={"vtc-navbtn" + (view === "history" ? " is-active" : "")} onClick={() => setView("history")}>
-          <History size={16} /> Historique
-        </button>
-        <button className="vtc-navbtn" onClick={onSettings}>
-          <Settings size={16} /> Profil
-        </button>
-      </nav>
+      <button className="vtc-wheel-btn" onClick={onLookup} title="Retrouver un bon de commande / une facture">
+        <SteeringWheelIcon size={22} />
+      </button>
     </header>
+  );
+}
+
+function SteeringWheelIcon({ size = 20, color = "#0B2A6B" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="2.4" fill={color} stroke="none" />
+      <line x1="12" y1="3" x2="12" y2="9.6" />
+      <line x1="5.6" y1="16" x2="10.2" y2="13.2" />
+      <line x1="18.4" y1="16" x2="13.8" y2="13.2" />
+    </svg>
   );
 }
 
@@ -386,21 +412,20 @@ function Home({ driver, onBook, bookings }) {
           <span className="vtc-eyebrow">Réservation en direct</span>
           <h1>À l'heure, en toute <br />sécurité. Toujours.</h1>
           <p className="vtc-sub">
-            Réservez {driver.name === "Votre chauffeur" ? "votre chauffeur" : driver.name} à l'avance, en toute tranquillité.
+            Réservez votre chauffeur à l'avance, en toute tranquillité.
             Prix annoncé avant la course, paiement sécurisé par carte.
           </p>
-          <button className="vtc-cta" onClick={onBook}>
+          <button className="vtc-cta vtc-cta-gold" onClick={onBook}>
             Réserver une course <Navigation size={16} />
           </button>
 
-          <div className="vtc-driver-card">
-            <div className="vtc-avatar">{driver.name.charAt(0)}</div>
-            <div>
-              <div className="vtc-driver-name">{driver.name}</div>
-              <div className="vtc-driver-meta">
-                <Star size={13} className="vtc-star" /> {driver.rating.toFixed(1)} · {driver.vehicle} · {driver.plate}
-              </div>
-            </div>
+          <div className="vtc-rating-badge">
+            <span className="vtc-rating-value">{driver.rating.toFixed(1)}</span>
+            <span className="vtc-rating-stars">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Star key={i} size={16} className="vtc-star-gold" />
+              ))}
+            </span>
           </div>
         </div>
 
@@ -481,6 +506,39 @@ function MapCard() {
         <rect x="16" y="98" width="26" height="22" fill="#DFDFD8" rx="3" />
         <rect x="250" y="150" width="32" height="26" fill="#DFDFD8" rx="3" />
         <rect x="168" y="150" width="26" height="30" fill="#DFDFD8" rx="3" />
+
+        {/* Tour Eiffel */}
+        <g transform="translate(48,4)" stroke="#5B6B7A" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none">
+          <path d="M10,0 L7,12 L4,24 L0,34 M10,0 L13,12 L16,24 L20,34 M7,12 L13,12 M4,24 L16,24 M0,34 L20,34" />
+        </g>
+
+        {/* Disneyland */}
+        <g transform="translate(213,178)" stroke="#5B6B7A" strokeWidth="1.2" strokeLinejoin="round">
+          <rect x="0" y="14" width="8" height="16" fill="#F2F1EC" />
+          <path d="M0,14 L4,4 L8,14 Z" fill="#B9B9B2" />
+          <rect x="24" y="14" width="8" height="16" fill="#F2F1EC" />
+          <path d="M24,14 L28,4 L32,14 Z" fill="#B9B9B2" />
+          <rect x="11" y="6" width="10" height="24" fill="#F2F1EC" />
+          <path d="M11,6 L16,-6 L21,6 Z" fill="#B9B9B2" />
+          <line x1="16" y1="-6" x2="16" y2="-11" strokeWidth="1" />
+          <path d="M16,-11 L20,-9 L16,-7 Z" fill="#5B6B7A" stroke="none" />
+        </g>
+
+        {/* Arc de Triomphe */}
+        <g transform="translate(210,92)">
+          <path
+            d="M0,0 H26 V20 H0 Z M8,20 V12 A5,5 0 0 1 18,12 V20 Z"
+            fillRule="evenodd"
+            fill="#C7C6C0"
+            stroke="#5B6B7A"
+            strokeWidth="1.2"
+          />
+        </g>
+
+        {/* Aéroport */}
+        <g transform="translate(80,178)" fill="#5B6B7A">
+          <path d="M13,0 L15,10 L26,15 L26,17 L15,14 L15,21 L19,24 L19,26 L13,24 L7,26 L7,24 L11,21 L11,14 L0,17 L0,15 L11,10 Z" />
+        </g>
 
         <path
           ref={pathRef}
@@ -614,21 +672,20 @@ function Booking({ trip, setTrip, onBack, onNext }) {
 // ---------------------------------------------------------------------------
 // Payment (simulated card capture — see chat notes on real Stripe wiring)
 // ---------------------------------------------------------------------------
-function Payment({ trip, estimate, driver, onBack, onPay, onViewOrder }) {
+function Payment({ trip, estimate, courseNumber, onBack, onPay, onViewOrder }) {
   const [clientEmail, setClientEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
-  const reference = "COURSE-" + trip.pickup.slice(0, 3).toUpperCase().replace(/[^A-Z]/g, "X") + Math.floor(Math.random() * 900 + 100);
 
   async function sendOrderEmail() {
     setSending(true);
     setError("");
     const reservedAt = new Date();
-    const subject = `Bon de commande ${reference} — ${formatEUR(estimate.price)}`;
+    const subject = `Bon de commande ${courseNumber} — ${formatEUR(estimate.price)}`;
     const message =
       `Nouvelle demande de course à facturer :\n\n` +
-      `Référence : ${reference}\n` +
+      `Numéro de course : ${courseNumber}\n` +
       `Société : MBA Premium\n` +
       `Réservation effectuée le ${reservedAt.toLocaleDateString("fr-FR")} à ${reservedAt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}\n` +
       `Client : ${trip.clientName || "(non renseigné)"}\n` +
@@ -842,7 +899,7 @@ function Confirm({ booking, driver, onHome, onViewInvoice }) {
       </div>
 
       <button className="vtc-cta vtc-cta-block" onClick={onHome}>Retour à l'accueil</button>
-      <button className="vtc-link-btn" onClick={onViewInvoice}>Voir la facture · {booking.invoiceNumber}</button>
+      <button className="vtc-link-btn" onClick={onViewInvoice}>Voir la facture · {booking.courseNumber}</button>
     </div>
   );
 }
@@ -867,9 +924,9 @@ function HistoryView({ bookings, onHome, onViewInvoice }) {
               <div className="vtc-summary-meta">
                 {new Date(b.createdAt).toLocaleDateString("fr-FR")} · {b.distanceKm} km
               </div>
-              {b.invoiceNumber && (
+              {b.courseNumber && (
                 <button className="vtc-link-btn" style={{ margin: "4px 0 0", textAlign: "left" }} onClick={() => onViewInvoice(b)}>
-                  Facture {b.invoiceNumber}
+                  N° {b.courseNumber}
                 </button>
               )}
             </div>
@@ -887,7 +944,19 @@ function HistoryView({ bookings, onHome, onViewInvoice }) {
 function Document({ type, booking, driver, onClose }) {
   const [downloading, setDownloading] = useState(false);
   const isInvoice = type === "invoice";
-  const docNumber = isInvoice ? booking.invoiceNumber : "DEVIS-" + hashString(booking.pickup + booking.dropoff).toString(36).toUpperCase().slice(0, 6);
+
+  if (!booking) {
+    return (
+      <div className="vtc-doc-wrap">
+        <div className="vtc-doc-bar vtc-no-print">
+          <button className="vtc-icon-btn" onClick={onClose}><ChevronLeft size={18} /></button>
+          <span>Document introuvable</span>
+        </div>
+      </div>
+    );
+  }
+
+  const docNumber = booking.courseNumber;
   const docDate = booking.createdAt ? new Date(booking.createdAt) : new Date();
   const docTime = docDate.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
@@ -897,7 +966,7 @@ function Document({ type, booking, driver, onClose }) {
       const modeLabel = booking.mode === "now" ? "Départ immédiat" : `Planifiée le ${booking.date} à ${booking.time}`;
       const blob = isInvoice
         ? await generateInvoicePDFBlob({
-            invoiceNumber: booking.invoiceNumber,
+            courseNumber: docNumber,
             clientName: booking.clientName,
             clientEmail: booking.clientEmail,
             pickup: booking.pickup,
@@ -916,7 +985,7 @@ function Document({ type, booking, driver, onClose }) {
             reservedAt: docDate,
           })
         : await generateOrderPDFBlob({
-            reference: docNumber,
+            courseNumber: docNumber,
             clientName: booking.clientName,
             clientEmail: booking.clientEmail,
             pickup: booking.pickup,
@@ -1029,6 +1098,77 @@ function Document({ type, booking, driver, onClose }) {
 }
 
 
+// ---------------------------------------------------------------------------
+// Lookup — retrouver un bon de commande / une facture par numéro de course
+// ---------------------------------------------------------------------------
+function Lookup({ bookings, onHome, onViewOrder, onViewInvoice }) {
+  const [query, setQuery] = useState("");
+  const [searched, setSearched] = useState(false);
+  const [result, setResult] = useState(null);
+
+  function search() {
+    const q = query.trim().toLowerCase();
+    const found = bookings.find((b) => (b.courseNumber || "").toLowerCase() === q);
+    setResult(found || null);
+    setSearched(true);
+  }
+
+  const isPaid = result && result.paymentStatus && result.paymentStatus !== "Bon de commande émis";
+
+  return (
+    <div className="vtc-panel">
+      <PanelHeader title="Retrouver une course" onBack={onHome} />
+
+      <div className="vtc-field">
+        <label>Numéro de course</label>
+        <input
+          type="text"
+          placeholder="Ex. COURSE-2026-0001"
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setSearched(false); }}
+          onKeyDown={(e) => { if (e.key === "Enter") search(); }}
+        />
+      </div>
+
+      <button className="vtc-cta vtc-cta-block" disabled={!query.trim()} onClick={search}>
+        Rechercher
+      </button>
+
+      {searched && !result && (
+        <p className="vtc-fineprint" style={{ marginTop: 16 }}>
+          Aucune course trouvée avec ce numéro. Vérifiez qu'il est bien complet.
+        </p>
+      )}
+
+      {result && (
+        <div className="vtc-summary" style={{ marginTop: 18 }}>
+          <div className="vtc-summary-row">
+            <span>{result.pickup}</span>
+            <span className="vtc-recent-arrow">→</span>
+            <span>{result.dropoff}</span>
+          </div>
+          <div className="vtc-summary-meta">
+            N° {result.courseNumber} · {new Date(result.createdAt).toLocaleDateString("fr-FR")} · {result.distanceKm} km
+          </div>
+          <div className="vtc-summary-price">{formatEUR(result.price)}</div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14 }}>
+            <button className="vtc-cta vtc-cta-block" onClick={() => onViewOrder(result)}>
+              Télécharger le bon de commande (PDF)
+            </button>
+            <button className="vtc-cta vtc-cta-block" disabled={!isPaid} onClick={() => onViewInvoice(result)}>
+              Télécharger la facture (PDF)
+            </button>
+            {!isPaid && (
+              <p className="vtc-fineprint">La facture sera disponible une fois le paiement confirmé.</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SettingsModal({ driver, onSave, onClose }) {
   const [form, setForm] = useState({ siret: "", kbis: "", address: "", email: "", ...driver });
   return (
@@ -1122,6 +1262,10 @@ function Style() {
       .vtc-brand-mark { width: 34px; height: 34px; object-fit: contain; }
       .vtc-brand-text { display: flex; flex-direction: column; line-height: 1.2; }
       .vtc-brand-text small { font-family: 'Inter', sans-serif; font-weight: 500; font-size: 10px; color: var(--vtc-text-muted); letter-spacing: .02em; }
+      .vtc-wheel-btn { width: 40px; height: 40px; border-radius: 50%; background: #0B2A6B; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform .15s; }
+      .vtc-wheel-btn svg { stroke: #FFFFFF; }
+      .vtc-wheel-btn svg circle:last-of-type { fill: #FFFFFF; }
+      .vtc-wheel-btn:hover { transform: scale(1.06); }
       .vtc-hero-logo { width: 46px; height: 46px; object-fit: contain; margin-bottom: 12px; }
       .vtc-nav { display: flex; gap: 8px; }
       .vtc-navbtn {
@@ -1148,12 +1292,13 @@ function Style() {
       .vtc-cta:hover { transform: translateY(-1px); }
       .vtc-cta:disabled { opacity: .4; cursor: not-allowed; transform: none; }
       .vtc-cta-block { display: flex; width: 100%; justify-content: center; margin-top: 8px; }
+      .vtc-cta-gold { background: linear-gradient(135deg, #E7C158, #C9982E); color: #14100A; box-shadow: 0 6px 18px rgba(201,152,46,0.35); }
+      .vtc-cta-gold:hover { background: linear-gradient(135deg, #EFCB68, #D4A63A); }
 
-      .vtc-driver-card { display: flex; align-items: center; gap: 12px; margin-top: 26px; padding: 12px 14px; background: var(--vtc-surface); border: 1px solid var(--vtc-border); border-radius: 12px; max-width: 320px; }
-      .vtc-avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--vtc-surface-alt); display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', sans-serif; font-weight: 600; color: var(--vtc-accent); }
-      .vtc-driver-name { font-weight: 600; font-size: 14px; }
-      .vtc-driver-meta { color: var(--vtc-text-muted); font-size: 12.5px; display: flex; align-items: center; gap: 4px; margin-top: 2px; }
-      .vtc-star { color: var(--vtc-accent); fill: var(--vtc-accent); }
+      .vtc-rating-badge { display: flex; align-items: center; gap: 10px; margin-top: 26px; }
+      .vtc-rating-value { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px; color: #B8860B; }
+      .vtc-rating-stars { display: flex; gap: 2px; }
+      .vtc-star-gold { color: #D4AF37; fill: #D4AF37; }
 
       .vtc-map-card { border: 1px solid var(--vtc-border); border-radius: 16px; overflow: hidden; position: relative; box-shadow: 0 8px 24px rgba(11,42,74,0.08); }
       .vtc-map-svg { width: 100%; height: auto; display: block; }
