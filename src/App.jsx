@@ -1603,14 +1603,14 @@ function Style() {
       }
       .vtc-brand { display: flex; align-items: center; gap: 10px; font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px; cursor: pointer; }
       .vtc-brand em { font-style: normal; color: var(--vtc-accent); }
-      .vtc-brand-mark { width: 34px; height: 34px; object-fit: contain; }
+      .vtc-brand-mark { width: 52px; height: 52px; object-fit: contain; }
       .vtc-brand-text { display: flex; flex-direction: column; line-height: 1.2; }
       .vtc-brand-text small { font-family: 'Inter', sans-serif; font-weight: 500; font-size: 10px; color: var(--vtc-text-muted); letter-spacing: .02em; }
       .vtc-wheel-btn { width: 40px; height: 40px; border-radius: 50%; background: #0B2A6B; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform .15s; }
       .vtc-wheel-btn svg { stroke: #FFFFFF; }
       .vtc-wheel-btn svg circle:last-of-type { fill: #FFFFFF; }
       .vtc-wheel-btn:hover { transform: scale(1.06); }
-      .vtc-hero-logo { width: 46px; height: 46px; object-fit: contain; margin-bottom: 12px; }
+      .vtc-hero-logo { width: 72px; height: 72px; object-fit: contain; margin-bottom: 12px; }
       .vtc-nav { display: flex; gap: 8px; }
       .vtc-navbtn {
         display: flex; align-items: center; gap: 6px; background: transparent; border: 1px solid var(--vtc-border);
