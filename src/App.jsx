@@ -89,7 +89,7 @@ function loadJsPDF() {
   return jsPDFReadyPromise;
 }
 
-async function generateOrderPDFBlob({ courseNumber, clientName, clientEmail, pickup, dropoff, modeLabel, distanceKm, durationMin, priceHT, tva, price, driverKbis, reservedAt }) {
+async function generateOrderPDFBlob({ courseNumber, clientName, clientPhone, clientEmail, pickup, dropoff, modeLabel, distanceKm, durationMin, priceHT, tva, price, driverKbis, reservedAt }) {
   const JsPDFClass = await loadJsPDF();
   const doc = new JsPDFClass();
 
@@ -109,6 +109,7 @@ async function generateOrderPDFBlob({ courseNumber, clientName, clientEmail, pic
   line(`Société : MBA Premium`);
   if (driverKbis) line(`Kbis n° ${driverKbis}`);
   line(`Client : ${clientName || "(non renseigné)"}`);
+  if (clientPhone) line(`Téléphone : ${clientPhone}`);
   line(`Email du client : ${clientEmail}`);
   y += 4;
   line(`Départ : ${pickup}`);
@@ -130,7 +131,7 @@ async function generateOrderPDFBlob({ courseNumber, clientName, clientEmail, pic
   return doc.output("blob");
 }
 
-async function generateInvoicePDFBlob({ courseNumber, clientName, clientEmail, pickup, dropoff, distanceKm, durationMin, priceHT, tva, price, paymentMethod, paymentStatus, driverName, driverSiret, driverKbis, driverAddress, reservedAt }) {
+async function generateInvoicePDFBlob({ courseNumber, clientName, clientPhone, clientEmail, pickup, dropoff, distanceKm, durationMin, priceHT, tva, price, paymentMethod, paymentStatus, driverName, driverSiret, driverKbis, driverAddress, reservedAt }) {
   const JsPDFClass = await loadJsPDF();
   const doc = new JsPDFClass();
 
@@ -154,6 +155,7 @@ async function generateInvoicePDFBlob({ courseNumber, clientName, clientEmail, p
   if (driverKbis) line(`Kbis n° ${driverKbis}`);
   y += 4;
   line(`Client : ${clientName || "(non renseigné)"}`);
+  if (clientPhone) line(`Téléphone : ${clientPhone}`);
   line(`Email du client : ${clientEmail || "(non renseigné)"}`);
   y += 4;
   line(`Départ : ${pickup}`);
@@ -271,7 +273,7 @@ const DRIVER_PASSWORD = "Mahdi1234!";
 export default function App() {
   const [view, setView] = useState("home"); // home | booking | payment | history | driverspace | track
   const [driver, setDriver] = useState({ name: "Votre chauffeur", vehicle: "Peugeot 508", plate: "AB-123-CD", rating: 4.9, siret: "", kbis: "", address: "", email: "mbapremiumfr@gmail.com" });
-  const [trip, setTrip] = useState({ pickup: "", dropoff: "", mode: "later", date: "", time: "", clientName: "" });
+  const [trip, setTrip] = useState({ pickup: "", dropoff: "", mode: "later", date: "", time: "", clientName: "", clientPhone: "" });
   const [estimate, setEstimate] = useState(null);
   const [courseNumber, setCourseNumber] = useState("");
   const [currentRecordId, setCurrentRecordId] = useState(null);
@@ -279,6 +281,18 @@ export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [docTarget, setDocTarget] = useState(null); // { type: 'order'|'invoice', booking }
+
+  // Définit l'icône de l'onglet du navigateur avec le logo MBA Premium
+  useEffect(() => {
+    let link = document.querySelector("link[rel~='icon']");
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "icon";
+      document.head.appendChild(link);
+    }
+    link.type = "image/png";
+    link.href = LOGO_SRC;
+  }, []);
 
   // Load persisted data (partagé entre tous les utilisateurs de l'app, via Firestore)
   useEffect(() => {
@@ -346,6 +360,7 @@ export default function App() {
       date: trip.date,
       time: trip.time,
       clientName: trip.clientName,
+      clientPhone: trip.clientPhone,
       clientEmail: "",
       ...est,
       paymentMethod: "",
@@ -507,7 +522,6 @@ function Home({ driver, onBook, onTrack, bookings }) {
           <button className="vtc-cta vtc-cta-gold" onClick={onBook}>
             Réserver une course <Navigation size={16} />
           </button>
-          <button className="vtc-link-btn" onClick={onTrack}>Suivre ma réservation</button>
 
           <div className="vtc-rating-badge">
             <span className="vtc-rating-value">{driver.rating.toFixed(1)}</span>
@@ -697,6 +711,16 @@ function Booking({ trip, setTrip, onBack, onNext }) {
           placeholder="Jean Dupont"
           value={trip.clientName}
           onChange={(e) => setTrip({ ...trip, clientName: e.target.value })}
+        />
+      </div>
+
+      <div className="vtc-field">
+        <label>Numéro de téléphone</label>
+        <input
+          type="tel"
+          placeholder="06 12 34 56 78"
+          value={trip.clientPhone}
+          onChange={(e) => setTrip({ ...trip, clientPhone: e.target.value })}
         />
       </div>
 
@@ -1066,6 +1090,7 @@ function Document({ type, booking, driver, onClose }) {
         ? await generateInvoicePDFBlob({
             courseNumber: docNumber,
             clientName: booking.clientName,
+            clientPhone: booking.clientPhone,
             clientEmail: booking.clientEmail,
             pickup: booking.pickup,
             dropoff: booking.dropoff,
@@ -1085,6 +1110,7 @@ function Document({ type, booking, driver, onClose }) {
         : await generateOrderPDFBlob({
             courseNumber: docNumber,
             clientName: booking.clientName,
+            clientPhone: booking.clientPhone,
             clientEmail: booking.clientEmail,
             pickup: booking.pickup,
             dropoff: booking.dropoff,
@@ -1145,6 +1171,7 @@ function Document({ type, booking, driver, onClose }) {
           <div>
             <span className="vtc-doc-label">Client</span>
             <p>{booking.clientName || "Client MBA Premium"}</p>
+            {booking.clientPhone && <p>{booking.clientPhone}</p>}
             {booking.clientEmail && <p>{booking.clientEmail}</p>}
           </div>
         </div>
