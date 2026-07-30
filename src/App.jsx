@@ -512,7 +512,6 @@ function Home({ driver, onBook, onTrack, bookings }) {
     <div className="vtc-home">
       <section className="vtc-hero">
         <div className="vtc-hero-copy">
-          <img src={LOGO_SRC} alt="MBA Premium" className="vtc-hero-logo" />
           <span className="vtc-eyebrow">Réservation en direct</span>
           <h1>À l'heure, en toute <br />sécurité. Toujours.</h1>
           <p className="vtc-sub">
