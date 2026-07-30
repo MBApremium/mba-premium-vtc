@@ -3,6 +3,32 @@ import {
   MapPin, Clock, CreditCard, Car, CheckCircle2, ChevronLeft,
   Calendar, Star, Navigation, Loader2, History, Settings, X, Plus
 } from "lucide-react";
+import { initializeApp } from "firebase/app";
+import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+
+// ---------------------------------------------------------------------------
+// Firebase (vraie base de données partagée entre tous les appareils)
+// ---------------------------------------------------------------------------
+const firebaseConfig = {
+  apiKey: "AIzaSyBjq3roSL4_qDwJS76C-nLEuoVMNomtFns",
+  authDomain: "mba-premium-vtc.firebaseapp.com",
+  projectId: "mba-premium-vtc",
+  storageBucket: "mba-premium-vtc.firebasestorage.app",
+  messagingSenderId: "947559121129",
+  appId: "1:947559121129:web:317a81f3732018e3afb078",
+  measurementId: "G-4PS617KS0G",
+};
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+
+async function dbGet(key) {
+  const snap = await getDoc(doc(db, "app", key));
+  return snap.exists() ? snap.data() : null;
+}
+
+async function dbSet(key, data) {
+  await setDoc(doc(db, "app", key), data);
+}
 
 const LOGO_SRC = "data:image/png;base64,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";
 
@@ -254,29 +280,33 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [docTarget, setDocTarget] = useState(null); // { type: 'order'|'invoice', booking }
 
-  // Load persisted data (partagé entre tous les utilisateurs de l'app)
+  // Load persisted data (partagé entre tous les utilisateurs de l'app, via Firestore)
   useEffect(() => {
     (async () => {
       try {
-        const d = await window.storage.get("driver-profile", true);
-        if (d && d.value) setDriver(JSON.parse(d.value));
-      } catch (e) {}
+        const d = await dbGet("driver-profile");
+        if (d) setDriver(d);
+      } catch (e) {
+        console.error("Chargement du profil chauffeur impossible :", e);
+      }
       try {
-        const b = await window.storage.get("bookings", true);
-        if (b && b.value) setBookings(JSON.parse(b.value));
-      } catch (e) {}
+        const b = await dbGet("bookings");
+        if (b && Array.isArray(b.list)) setBookings(b.list);
+      } catch (e) {
+        console.error("Chargement des réservations impossible :", e);
+      }
       setLoaded(true);
     })();
   }, []);
 
   async function persistDriver(next) {
     setDriver(next);
-    try { await window.storage.set("driver-profile", JSON.stringify(next), true); } catch (e) {}
+    try { await dbSet("driver-profile", next); } catch (e) { console.error("Enregistrement du profil impossible :", e); }
   }
 
   async function persistBookings(next) {
     setBookings(next);
-    try { await window.storage.set("bookings", JSON.stringify(next), true); } catch (e) {}
+    try { await dbSet("bookings", { list: next }); } catch (e) { console.error("Enregistrement des réservations impossible :", e); }
     return next;
   }
 
@@ -288,13 +318,13 @@ export default function App() {
   async function nextCourseNumber() {
     let n = 1;
     try {
-      const r = await window.storage.get("course-seq", true);
-      if (r && r.value) n = parseInt(r.value, 10) + 1;
+      const r = await dbGet("course-seq");
+      if (r && r.n) n = r.n + 1;
     } catch (e) {
       console.error("Lecture du compteur de course impossible :", e);
     }
     try {
-      await window.storage.set("course-seq", String(n), true);
+      await dbSet("course-seq", { n });
     } catch (e) {
       console.error("Écriture du compteur de course impossible :", e);
     }
