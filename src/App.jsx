@@ -146,9 +146,9 @@ async function generateInvoicePDFBlob({ courseNumber, clientName, clientEmail, p
   return doc.output("blob");
 }
 
-async function sendRealEmail(subject, message) {
+async function sendRealEmail(subject, message, toEmail) {
   const ejs = await loadEmailJS();
-  return ejs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, { subject, message });
+  return ejs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, { subject, message, to_email: toEmail });
 }
 
 // ---------------------------------------------------------------------------
@@ -163,21 +163,63 @@ function hashString(str) {
   return Math.abs(h);
 }
 
-function estimateTrip(pickup, dropoff) {
-  const seed = hashString((pickup + "|" + dropoff).toLowerCase());
-  const distanceKm = 2.5 + (seed % 180) / 10; // 2.5 - 20.5 km
-  const durationMin = Math.round(distanceKm * 2.1 + 4);
+function priceFromDistance(distanceKm, durationMin) {
   const roundedDistanceKm = Math.round(distanceKm * 10) / 10;
   const priceHT = roundedDistanceKm * 2;
   const tva = priceHT * 0.10;
   const price = priceHT + tva;
   return {
     distanceKm: roundedDistanceKm,
-    durationMin,
+    durationMin: Math.round(durationMin),
     priceHT: Math.round(priceHT * 100) / 100,
     tva: Math.round(tva * 100) / 100,
     price: Math.round(price * 100) / 100,
   };
+}
+
+function simulatedEstimate(pickup, dropoff) {
+  const seed = hashString((pickup + "|" + dropoff).toLowerCase());
+  const distanceKm = 2.5 + (seed % 180) / 10; // 2.5 - 20.5 km
+  const durationMin = distanceKm * 2.1 + 4;
+  return priceFromDistance(distanceKm, durationMin);
+}
+
+async function geocodeAddress(address) {
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=fr&q=${encodeURIComponent(address)}`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = await res.json();
+  if (!data || !data.length) return null;
+  return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+}
+
+async function fetchDrivingRoute(origin, destination) {
+  const url = `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=false`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = await res.json();
+  if (!data.routes || !data.routes.length) return null;
+  return { distanceMeters: data.routes[0].distance, durationSeconds: data.routes[0].duration };
+}
+
+// Calcule un trajet réel (géocodage + itinéraire routier). Se rabat sur une estimation
+// simulée si les adresses ne sont pas reconnues ou si le service est indisponible.
+async function estimateTrip(pickup, dropoff) {
+  try {
+    const [origin, destination] = await Promise.all([geocodeAddress(pickup), geocodeAddress(dropoff)]);
+    if (origin && destination) {
+      const route = await fetchDrivingRoute(origin, destination);
+      if (route) {
+        return {
+          ...priceFromDistance(route.distanceMeters / 1000, route.durationSeconds / 60),
+          simulated: false,
+        };
+      }
+    }
+  } catch (e) {
+    console.error("Itinéraire réel indisponible, estimation utilisée à la place :", e);
+  }
+  return { ...simulatedEstimate(pickup, dropoff), simulated: true };
 }
 
 function formatEUR(n) {
@@ -188,11 +230,10 @@ function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
-// ---------------------------------------------------------------------------
-// Root component
-// ---------------------------------------------------------------------------
+const DRIVER_PASSWORD = "Mahdi1234!";
+
 export default function App() {
-  const [view, setView] = useState("home"); // home | booking | payment | confirm | history | lookup
+  const [view, setView] = useState("home"); // home | booking | payment | history | driverspace | track
   const [driver, setDriver] = useState({ name: "Votre chauffeur", vehicle: "Peugeot 508", plate: "AB-123-CD", rating: 4.9, siret: "", kbis: "", address: "", email: "mbapremiumfr@gmail.com" });
   const [trip, setTrip] = useState({ pickup: "", dropoff: "", mode: "later", date: "", time: "", clientName: "" });
   const [estimate, setEstimate] = useState(null);
@@ -201,18 +242,17 @@ export default function App() {
   const [bookings, setBookings] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [lastBooking, setLastBooking] = useState(null);
   const [docTarget, setDocTarget] = useState(null); // { type: 'order'|'invoice', booking }
 
-  // Load persisted data
+  // Load persisted data (partagé entre tous les utilisateurs de l'app)
   useEffect(() => {
     (async () => {
       try {
-        const d = await window.storage.get("driver-profile");
+        const d = await window.storage.get("driver-profile", true);
         if (d && d.value) setDriver(JSON.parse(d.value));
       } catch (e) {}
       try {
-        const b = await window.storage.get("bookings");
+        const b = await window.storage.get("bookings", true);
         if (b && b.value) setBookings(JSON.parse(b.value));
       } catch (e) {}
       setLoaded(true);
@@ -221,12 +261,12 @@ export default function App() {
 
   async function persistDriver(next) {
     setDriver(next);
-    try { await window.storage.set("driver-profile", JSON.stringify(next)); } catch (e) {}
+    try { await window.storage.set("driver-profile", JSON.stringify(next), true); } catch (e) {}
   }
 
   async function persistBookings(next) {
     setBookings(next);
-    try { await window.storage.set("bookings", JSON.stringify(next)); } catch (e) {}
+    try { await window.storage.set("bookings", JSON.stringify(next), true); } catch (e) {}
     return next;
   }
 
@@ -238,17 +278,17 @@ export default function App() {
   async function nextCourseNumber() {
     let n = 1;
     try {
-      const r = await window.storage.get("course-seq");
+      const r = await window.storage.get("course-seq", true);
       if (r && r.value) n = parseInt(r.value, 10) + 1;
     } catch (e) {}
-    try { await window.storage.set("course-seq", String(n)); } catch (e) {}
+    try { await window.storage.set("course-seq", String(n), true); } catch (e) {}
     const year = new Date().getFullYear();
     return `COURSE-${year}-${String(n).padStart(4, "0")}`;
   }
 
   // Génère le numéro de course et crée le bon de commande (persisté dès cette étape)
   async function goToPayment() {
-    const est = estimateTrip(trip.pickup, trip.dropoff);
+    const est = await estimateTrip(trip.pickup, trip.dropoff);
     const number = await nextCourseNumber();
     const record = {
       id: uid(),
@@ -273,47 +313,56 @@ export default function App() {
     setView("payment");
   }
 
-  async function completePayment(paymentMethod, clientEmail) {
-    const updatedFields = { clientEmail, paymentMethod, paymentStatus: "en attente de vérification" };
-    const next = bookings.map((b) => (b.id === currentRecordId ? { ...b, ...updatedFields } : b));
+  // Enregistre l'email du client saisi une fois le bon de commande envoyé
+  async function attachClientEmail(clientEmail) {
+    const next = bookings.map((b) => (b.id === currentRecordId ? { ...b, clientEmail } : b));
     await persistBookings(next);
-    const record = next.find((b) => b.id === currentRecordId);
-    if (!record) return;
+  }
+
+  // Appelé depuis l'espace chauffeur (protégé par mot de passe) pour confirmer un paiement
+  async function confirmCoursePayment(number) {
+    const idx = bookings.findIndex((b) => (b.courseNumber || "").toLowerCase() === number.trim().toLowerCase());
+    if (idx === -1) return false;
+    const updated = {
+      ...bookings[idx],
+      paymentStatus: "Course confirmée",
+      paymentMethod: bookings[idx].paymentMethod || "Carte bancaire (SumUp)",
+    };
+    const next = [...bookings];
+    next[idx] = updated;
+    await persistBookings(next);
 
     try {
-      const reservedAt = new Date(record.createdAt);
-      const subject = `Facture ${record.courseNumber} — ${formatEUR(record.price)}`;
-      const message =
-        `Paiement confirmé par le client.\n\n` +
-        `Numéro de course : ${record.courseNumber}\n` +
-        `Société : MBA Premium\n` +
-        `Réservation effectuée le ${reservedAt.toLocaleDateString("fr-FR")} à ${reservedAt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}\n` +
-        `Client : ${record.clientName || "(non renseigné)"}\n` +
-        `Email du client : ${clientEmail || "(non renseigné)"}\n\n` +
-        `Départ : ${record.pickup}\n` +
-        `Arrivée : ${record.dropoff}\n` +
-        `Distance : ${record.distanceKm} km\n\n` +
-        `Total HT (${record.distanceKm} km × 2,00 €) : ${formatEUR(record.priceHT)}\n` +
-        `TVA (10%) : ${formatEUR(record.tva)}\n` +
-        `Total TTC : ${formatEUR(record.price)}\n` +
-        `Moyen de paiement : ${paymentMethod}\n` +
-        `Statut : ${record.paymentStatus}`;
-      await sendRealEmail(subject, message);
+      if (updated.clientEmail) {
+        const subject = `Course confirmée — ${updated.courseNumber}`;
+        const rdv = updated.mode === "later" && updated.date
+          ? `le ${new Date(updated.date).toLocaleDateString("fr-FR")} à ${updated.time}`
+          : "à l'heure prévue";
+        const message =
+          `Bonjour,\n\n` +
+          `Merci pour votre confiance ! Votre course a été confirmée par le chauffeur.\n\n` +
+          `Le chauffeur va vous rejoindre ${rdv}, au ${updated.pickup}.\n\n` +
+          `Numéro de course : ${updated.courseNumber}\n` +
+          `Départ : ${updated.pickup}\n` +
+          `Arrivée : ${updated.dropoff}\n` +
+          `Montant : ${formatEUR(updated.price)}\n\n` +
+          `Merci pour votre confiance.\nMBA Premium`;
+        await sendRealEmail(subject, message, updated.clientEmail);
+      }
     } catch (e) {
-      // L'échec de l'envoi ne doit pas bloquer la confirmation de la course.
+      // L'échec de l'envoi ne doit pas bloquer la confirmation.
     }
 
-    setLastBooking(record);
-    setView("tracking");
+    return true;
   }
 
   return (
     <div className="vtc-root">
       <Style />
-      <TopBar view={view} setView={setView} onSettings={() => setShowSettings(true)} onLookup={() => setView("lookup")} driver={driver} />
+      <TopBar view={view} setView={setView} onDriverSpace={() => setView("driverspace")} driver={driver} />
 
       <main className="vtc-main">
-        {view === "home" && <Home driver={driver} onBook={goBooking} bookings={bookings} />}
+        {view === "home" && <Home driver={driver} onBook={goBooking} onTrack={() => setView("track")} bookings={bookings} />}
         {view === "booking" && (
           <Booking trip={trip} setTrip={setTrip} onBack={() => setView("home")} onNext={goToPayment} />
         )}
@@ -322,20 +371,10 @@ export default function App() {
             trip={trip}
             estimate={estimate}
             courseNumber={courseNumber}
+            driverEmail={driver.email}
             onBack={() => setView("booking")}
-            onPay={completePayment}
+            onEmailAttached={attachClientEmail}
             onViewOrder={() => setDocTarget({ type: "order", booking: bookings.find((b) => b.id === currentRecordId) })}
-          />
-        )}
-        {view === "tracking" && lastBooking && (
-          <Tracking booking={lastBooking} driver={driver} onArrived={() => setView("confirm")} />
-        )}
-        {view === "confirm" && lastBooking && (
-          <Confirm
-            booking={lastBooking}
-            driver={driver}
-            onHome={() => setView("home")}
-            onViewInvoice={() => setDocTarget({ type: "invoice", booking: lastBooking })}
           />
         )}
         {view === "history" && (
@@ -345,12 +384,15 @@ export default function App() {
             onViewInvoice={(b) => setDocTarget({ type: "invoice", booking: b })}
           />
         )}
-        {view === "lookup" && (
-          <Lookup
+        {view === "track" && <TrackStatus bookings={bookings} onHome={() => setView("home")} />}
+        {view === "driverspace" && (
+          <DriverSpace
             bookings={bookings}
             onHome={() => setView("home")}
             onViewOrder={(b) => setDocTarget({ type: "order", booking: b })}
             onViewInvoice={(b) => setDocTarget({ type: "invoice", booking: b })}
+            onConfirmPayment={confirmCoursePayment}
+            onOpenSettings={() => setShowSettings(true)}
           />
         )}
       </main>
@@ -371,7 +413,7 @@ export default function App() {
 // ---------------------------------------------------------------------------
 // Top bar
 // ---------------------------------------------------------------------------
-function TopBar({ view, setView, onSettings, onLookup, driver }) {
+function TopBar({ view, setView, onDriverSpace, driver }) {
   return (
     <header className="vtc-topbar">
       <div className="vtc-brand" onClick={() => setView("home")}>
@@ -381,7 +423,7 @@ function TopBar({ view, setView, onSettings, onLookup, driver }) {
           <small>Mindful.Business.Assurance</small>
         </div>
       </div>
-      <button className="vtc-wheel-btn" onClick={onLookup} title="Retrouver un bon de commande / une facture">
+      <button className="vtc-wheel-btn" onClick={onDriverSpace} title="Espace chauffeur">
         <SteeringWheelIcon size={22} />
       </button>
     </header>
@@ -403,7 +445,7 @@ function SteeringWheelIcon({ size = 20, color = "#0B2A6B" }) {
 // ---------------------------------------------------------------------------
 // Home / hero with signature route animation
 // ---------------------------------------------------------------------------
-function Home({ driver, onBook, bookings }) {
+function Home({ driver, onBook, onTrack, bookings }) {
   return (
     <div className="vtc-home">
       <section className="vtc-hero">
@@ -418,6 +460,7 @@ function Home({ driver, onBook, bookings }) {
           <button className="vtc-cta vtc-cta-gold" onClick={onBook}>
             Réserver une course <Navigation size={16} />
           </button>
+          <button className="vtc-link-btn" onClick={onTrack}>Suivre ma réservation</button>
 
           <div className="vtc-rating-badge">
             <span className="vtc-rating-value">{driver.rating.toFixed(1)}</span>
@@ -582,6 +625,7 @@ function MapCard() {
 // Booking form
 // ---------------------------------------------------------------------------
 function Booking({ trip, setTrip, onBack, onNext }) {
+  const [calculating, setCalculating] = useState(false);
   const now = new Date();
   const pad = (n) => String(n).padStart(2, "0");
   const minLead = new Date(now.getTime() + 60 * 60 * 1000); // maintenant + 1h
@@ -662,8 +706,12 @@ function Booking({ trip, setTrip, onBack, onNext }) {
         Les courses se réservent uniquement à l'avance, au moins 1 heure avant l'heure de prise en charge.
       </p>
 
-      <button className="vtc-cta vtc-cta-block" disabled={!canNext} onClick={onNext}>
-        Voir le tarif estimé
+      <button
+        className="vtc-cta vtc-cta-block"
+        disabled={!canNext || calculating}
+        onClick={async () => { setCalculating(true); await onNext(); }}
+      >
+        {calculating ? (<><Loader2 size={16} className="vtc-spin" /> Calcul de l'itinéraire…</>) : "Voir le tarif estimé"}
       </button>
     </div>
   );
@@ -672,7 +720,7 @@ function Booking({ trip, setTrip, onBack, onNext }) {
 // ---------------------------------------------------------------------------
 // Payment (simulated card capture — see chat notes on real Stripe wiring)
 // ---------------------------------------------------------------------------
-function Payment({ trip, estimate, courseNumber, onBack, onPay, onViewOrder }) {
+function Payment({ trip, estimate, courseNumber, driverEmail, onBack, onEmailAttached, onViewOrder }) {
   const [clientEmail, setClientEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
@@ -700,7 +748,8 @@ function Payment({ trip, estimate, courseNumber, onBack, onPay, onViewOrder }) {
       `→ Envoyez le lien de paiement SumUp (carte bancaire) de ce montant exact à ${clientEmail}.`;
 
     try {
-      await sendRealEmail(subject, message);
+      await sendRealEmail(subject, message, driverEmail);
+      await onEmailAttached(clientEmail);
       setSent(true);
     } catch (e) {
       const detail = (e && (e.text || e.message)) ? ` (${e.text || e.message})` : "";
@@ -725,6 +774,11 @@ function Payment({ trip, estimate, courseNumber, onBack, onPay, onViewOrder }) {
           {trip.mode === "now" ? "Départ immédiat" : `Planifiée · ${trip.date} à ${trip.time}`} · {estimate.distanceKm} km · ~{estimate.durationMin} min
         </div>
         <div className="vtc-summary-price">{formatEUR(estimate.price)}</div>
+        {estimate.simulated && (
+          <div className="vtc-summary-meta" style={{ marginTop: 6, color: "#B8860B" }}>
+            Adresse non reconnue par le service cartographique — distance estimée approximativement.
+          </div>
+        )}
       </div>
 
       <button className="vtc-link-btn" onClick={onViewOrder}>Voir le bon de commande</button>
@@ -751,15 +805,12 @@ function Payment({ trip, estimate, courseNumber, onBack, onPay, onViewOrder }) {
           {sending ? (<><Loader2 size={16} className="vtc-spin" /> Envoi en cours…</>) : "Envoyer le bon de commande au chauffeur"}
         </button>
       ) : (
-        <>
-          <div className="vtc-paypal-wait">
-            <Loader2 size={16} className="vtc-spin" />
-            <span>Le bon de commande a été envoyé au chauffeur. Il va vous envoyer un lien de paiement SumUp de {formatEUR(estimate.price)} à {clientEmail}.</span>
-          </div>
-          <button className="vtc-cta vtc-cta-block" onClick={() => onPay("Carte bancaire (SumUp)", clientEmail)}>
-            J'ai payé le lien reçu, confirmer la course
-          </button>
-        </>
+        <div className="vtc-check-mail">
+          <span className="vtc-check-mail-title">Vérifiez votre adresse mail</span>
+          <span className="vtc-check-mail-sub">
+            La réservation est envoyée à notre service de paiement. Vous allez recevoir un lien de paiement de {formatEUR(estimate.price)} à l'adresse {clientEmail}.
+          </span>
+        </div>
       )}
 
       <p className="vtc-fineprint">
@@ -1099,6 +1150,225 @@ function Document({ type, booking, driver, onClose }) {
 
 
 // ---------------------------------------------------------------------------
+// Espace chauffeur — protégé par mot de passe
+// ---------------------------------------------------------------------------
+function DriverSpace({ bookings, onHome, onViewOrder, onViewInvoice, onConfirmPayment, onOpenSettings }) {
+  const [authenticated, setAuthenticated] = useState(false);
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [section, setSection] = useState("menu"); // menu | documents | confirm
+
+  function tryLogin() {
+    if (password === DRIVER_PASSWORD) {
+      setAuthenticated(true);
+      setAuthError("");
+    } else {
+      setAuthError("Mot de passe incorrect.");
+    }
+  }
+
+  if (!authenticated) {
+    return (
+      <div className="vtc-panel">
+        <PanelHeader title="Espace chauffeur" onBack={onHome} />
+        <div className="vtc-field">
+          <label>Mot de passe</label>
+          <input
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => { setPassword(e.target.value); setAuthError(""); }}
+            onKeyDown={(e) => { if (e.key === "Enter") tryLogin(); }}
+          />
+        </div>
+        {authError && <p className="vtc-fineprint" style={{ color: "#c0392b" }}>{authError}</p>}
+        <button className="vtc-cta vtc-cta-block" onClick={tryLogin}>Entrer</button>
+      </div>
+    );
+  }
+
+  if (section === "documents") {
+    return (
+      <Lookup
+        bookings={bookings}
+        onHome={() => setSection("menu")}
+        onViewOrder={onViewOrder}
+        onViewInvoice={onViewInvoice}
+      />
+    );
+  }
+
+  if (section === "confirm") {
+    return <ConfirmPaymentTool bookings={bookings} onHome={() => setSection("menu")} onConfirm={onConfirmPayment} />;
+  }
+
+  return (
+    <div className="vtc-panel">
+      <PanelHeader title="Espace chauffeur" onBack={onHome} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <button className="vtc-cta vtc-cta-block" onClick={() => setSection("documents")}>
+          Bon de commande &amp; facture
+        </button>
+        <button className="vtc-cta vtc-cta-block" onClick={() => setSection("confirm")}>
+          Confirmer un paiement
+        </button>
+        <button className="vtc-cta vtc-cta-block" onClick={onOpenSettings}>
+          Profil chauffeur
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmPaymentTool({ bookings, onHome, onConfirm }) {
+  const [query, setQuery] = useState("");
+  const [found, setFound] = useState(null);
+  const [status, setStatus] = useState(null); // null | 'not_found' | 'confirming' | 'success' | 'error'
+
+  function locate() {
+    const q = query.trim().toLowerCase();
+    const b = bookings.find((x) => (x.courseNumber || "").toLowerCase() === q);
+    setFound(b || null);
+    setStatus(b ? null : "not_found");
+  }
+
+  async function confirm() {
+    if (!found) return;
+    setStatus("confirming");
+    const ok = await onConfirm(found.courseNumber);
+    setStatus(ok ? "success" : "error");
+  }
+
+  return (
+    <div className="vtc-panel">
+      <PanelHeader title="Confirmer un paiement" onBack={onHome} />
+
+      <div className="vtc-field">
+        <label>Numéro de course</label>
+        <input
+          type="text"
+          placeholder="Ex. COURSE-2026-0001"
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setFound(null); setStatus(null); }}
+          onKeyDown={(e) => { if (e.key === "Enter") locate(); }}
+        />
+      </div>
+
+      <button className="vtc-cta vtc-cta-block" disabled={!query.trim()} onClick={locate}>
+        Rechercher
+      </button>
+
+      {status === "not_found" && (
+        <p className="vtc-fineprint" style={{ marginTop: 16 }}>Aucune course trouvée avec ce numéro.</p>
+      )}
+
+      {found && status !== "success" && (
+        <div className="vtc-summary" style={{ marginTop: 18 }}>
+          <div className="vtc-summary-row">
+            <span>{found.pickup}</span>
+            <span className="vtc-recent-arrow">→</span>
+            <span>{found.dropoff}</span>
+          </div>
+          <div className="vtc-summary-meta">
+            Client : {found.clientName || "(non renseigné)"} · {found.clientEmail || "email non renseigné"}
+          </div>
+          <div className="vtc-summary-meta">Statut actuel : {found.paymentStatus}</div>
+          <div className="vtc-summary-price">{formatEUR(found.price)}</div>
+
+          <button
+            className="vtc-cta vtc-cta-block"
+            style={{ marginTop: 12 }}
+            disabled={status === "confirming"}
+            onClick={confirm}
+          >
+            {status === "confirming" ? "Confirmation en cours…" : "Confirmer le paiement"}
+          </button>
+          {status === "error" && (
+            <p className="vtc-fineprint" style={{ color: "#c0392b", marginTop: 8 }}>Une erreur est survenue, réessayez.</p>
+          )}
+        </div>
+      )}
+
+      {status === "success" && (
+        <div className="vtc-check-mail" style={{ marginTop: 18 }}>
+          <span className="vtc-check-mail-title">Course confirmée ✅</span>
+          <span className="vtc-check-mail-sub">Le client a été prévenu par email.</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TrackStatus — le client suit sa réservation avec son numéro de course
+// ---------------------------------------------------------------------------
+function TrackStatus({ bookings, onHome }) {
+  const [query, setQuery] = useState("");
+  const [searched, setSearched] = useState(false);
+  const [result, setResult] = useState(null);
+
+  function search() {
+    const q = query.trim().toLowerCase();
+    setResult(bookings.find((b) => (b.courseNumber || "").toLowerCase() === q) || null);
+    setSearched(true);
+  }
+
+  const isConfirmed = result && result.paymentStatus === "Course confirmée";
+
+  return (
+    <div className="vtc-panel">
+      <PanelHeader title="Suivre ma réservation" onBack={onHome} />
+
+      <div className="vtc-field">
+        <label>Numéro de course</label>
+        <input
+          type="text"
+          placeholder="Ex. COURSE-2026-0001"
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setSearched(false); }}
+          onKeyDown={(e) => { if (e.key === "Enter") search(); }}
+        />
+      </div>
+
+      <button className="vtc-cta vtc-cta-block" disabled={!query.trim()} onClick={search}>
+        Rechercher
+      </button>
+
+      {searched && !result && (
+        <p className="vtc-fineprint" style={{ marginTop: 16 }}>Aucune réservation trouvée avec ce numéro.</p>
+      )}
+
+      {result && (
+        <div className="vtc-summary" style={{ marginTop: 18 }}>
+          <div className="vtc-summary-row">
+            <span>{result.pickup}</span>
+            <span className="vtc-recent-arrow">→</span>
+            <span>{result.dropoff}</span>
+          </div>
+          <div className="vtc-summary-meta">
+            {result.mode === "later" && result.date ? `Prise en charge : ${result.date} à ${result.time}` : ""}
+          </div>
+          <div className="vtc-summary-price">{formatEUR(result.price)}</div>
+          {!isConfirmed && (
+            <div className="vtc-summary-meta" style={{ marginTop: 6 }}>Statut actuel : {result.paymentStatus}</div>
+          )}
+        </div>
+      )}
+
+      {isConfirmed && (
+        <div className="vtc-check-mail" style={{ marginTop: 14 }}>
+          <span className="vtc-check-mail-title">Course confirmée ✅ Merci pour votre confiance</span>
+          <span className="vtc-check-mail-sub">
+            Le chauffeur va vous rejoindre {result.mode === "later" && result.date ? `le ${new Date(result.date).toLocaleDateString("fr-FR")} à ${result.time}` : "à l'heure prévue"}, au {result.pickup}.
+            Merci pour votre confiance.
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Lookup — retrouver un bon de commande / une facture par numéro de course
 // ---------------------------------------------------------------------------
 function Lookup({ bookings, onHome, onViewOrder, onViewInvoice }) {
@@ -1361,6 +1631,9 @@ function Style() {
       .vtc-cta-sumup { background: #0BC5B1; color: #0B2A4A; }
       .vtc-cta-sumup:hover { background: #14d6c1; }
       .vtc-paypal-wait { display: flex; align-items: center; gap: 10px; background: var(--vtc-surface); border: 1px solid var(--vtc-border); border-radius: 10px; padding: 12px 14px; font-size: 13px; color: var(--vtc-text-muted); margin-bottom: 12px; }
+      .vtc-check-mail { background: #0B2A6B; border-radius: 12px; padding: 18px 16px; margin-bottom: 12px; text-align: center; }
+      .vtc-check-mail-title { display: block; color: #FFFFFF; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 17px; margin-bottom: 8px; }
+      .vtc-check-mail-sub { display: block; color: #FFFFFF; opacity: 0.9; font-size: 13px; line-height: 1.5; }
 
       .vtc-confirm { text-align: center; }
       .vtc-confirm-icon { width: 64px; height: 64px; border-radius: 50%; background: rgba(11,95,165,0.1); color: var(--vtc-accent-2); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
