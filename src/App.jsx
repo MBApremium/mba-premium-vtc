@@ -230,6 +230,16 @@ function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
+// Rend la recherche par numéro de course tolérante aux préfixes ("N°", "#"...), espaces et casse
+function normalizeCourseNumber(s) {
+  return (s || "")
+    .trim()
+    .toUpperCase()
+    .replace(/^N[°ºO]?\.?\s*/, "")
+    .replace(/^#\s*/, "")
+    .replace(/\s+/g, "");
+}
+
 const DRIVER_PASSWORD = "Mahdi1234!";
 
 export default function App() {
@@ -280,10 +290,17 @@ export default function App() {
     try {
       const r = await window.storage.get("course-seq", true);
       if (r && r.value) n = parseInt(r.value, 10) + 1;
-    } catch (e) {}
-    try { await window.storage.set("course-seq", String(n), true); } catch (e) {}
+    } catch (e) {
+      console.error("Lecture du compteur de course impossible :", e);
+    }
+    try {
+      await window.storage.set("course-seq", String(n), true);
+    } catch (e) {
+      console.error("Écriture du compteur de course impossible :", e);
+    }
     const year = new Date().getFullYear();
-    return `COURSE-${year}-${String(n).padStart(4, "0")}`;
+    const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+    return `COURSE-${year}-${String(n).padStart(4, "0")}-${suffix}`;
   }
 
   // Génère le numéro de course et crée le bon de commande (persisté dès cette étape)
@@ -1226,8 +1243,8 @@ function ConfirmPaymentTool({ bookings, onHome, onConfirm }) {
   const [status, setStatus] = useState(null); // null | 'not_found' | 'confirming' | 'success' | 'error'
 
   function locate() {
-    const q = query.trim().toLowerCase();
-    const b = bookings.find((x) => (x.courseNumber || "").toLowerCase() === q);
+    const q = normalizeCourseNumber(query);
+    const b = bookings.find((x) => normalizeCourseNumber(x.courseNumber) === q);
     setFound(b || null);
     setStatus(b ? null : "not_found");
   }
@@ -1308,8 +1325,8 @@ function TrackStatus({ bookings, onHome }) {
   const [result, setResult] = useState(null);
 
   function search() {
-    const q = query.trim().toLowerCase();
-    setResult(bookings.find((b) => (b.courseNumber || "").toLowerCase() === q) || null);
+    const q = normalizeCourseNumber(query);
+    setResult(bookings.find((b) => normalizeCourseNumber(b.courseNumber) === q) || null);
     setSearched(true);
   }
 
@@ -1357,7 +1374,7 @@ function TrackStatus({ bookings, onHome }) {
 
       {isConfirmed && (
         <div className="vtc-check-mail" style={{ marginTop: 14 }}>
-          <span className="vtc-check-mail-title">Course confirmée ✅ Merci pour votre confiance</span>
+          <span className="vtc-check-mail-title">Réservation confirmée ✅</span>
           <span className="vtc-check-mail-sub">
             Le chauffeur va vous rejoindre {result.mode === "later" && result.date ? `le ${new Date(result.date).toLocaleDateString("fr-FR")} à ${result.time}` : "à l'heure prévue"}, au {result.pickup}.
             Merci pour votre confiance.
@@ -1377,8 +1394,8 @@ function Lookup({ bookings, onHome, onViewOrder, onViewInvoice }) {
   const [result, setResult] = useState(null);
 
   function search() {
-    const q = query.trim().toLowerCase();
-    const found = bookings.find((b) => (b.courseNumber || "").toLowerCase() === q);
+    const q = normalizeCourseNumber(query);
+    const found = bookings.find((b) => normalizeCourseNumber(b.courseNumber) === q);
     setResult(found || null);
     setSearched(true);
   }
