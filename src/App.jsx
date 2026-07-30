@@ -221,6 +221,25 @@ async function geocodeAddress(address) {
   return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
 }
 
+// Suggestions d'adresses complètes (numéro, rue, commune, code postal) pendant la saisie
+async function searchAddressSuggestions(queryText) {
+  const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=fr&limit=5&q=${encodeURIComponent(queryText)}`;
+  const res = await fetch(url);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.map((item) => {
+    const a = item.address || {};
+    const streetNum = a.house_number ? a.house_number + " " : "";
+    const streetName = a.road || a.pedestrian || a.footway || "";
+    const city = a.city || a.town || a.village || a.municipality || "";
+    const postcode = a.postcode || "";
+    const formatted = [`${streetNum}${streetName}`.trim(), [postcode, city].filter(Boolean).join(" ")]
+      .filter(Boolean)
+      .join(", ");
+    return { label: formatted || item.display_name, full: item.display_name };
+  });
+}
+
 async function fetchDrivingRoute(origin, destination) {
   const url = `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};${destination.lng},${destination.lat}?overview=false`;
   const res = await fetch(url);
@@ -682,6 +701,73 @@ function MapCard() {
 }
 
 // ---------------------------------------------------------------------------
+// Champ d'adresse avec suggestions (numéro, rue, commune, code postal)
+// ---------------------------------------------------------------------------
+function AddressField({ label, icon, placeholder, value, onChange }) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef(null);
+
+  useEffect(() => {
+    if (!value || value.trim().length < 4) {
+      setSuggestions([]);
+      return;
+    }
+    let active = true;
+    setLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const results = await searchAddressSuggestions(value);
+        if (active) setSuggestions(results);
+      } catch (e) {
+        if (active) setSuggestions([]);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }, 450);
+    return () => { active = false; clearTimeout(t); };
+  }, [value]);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="vtc-field vtc-address-field" ref={boxRef}>
+      <label>{icon} {label}</label>
+      <input
+        type="text"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        autoComplete="off"
+      />
+      {open && value.trim().length >= 4 && (loading || suggestions.length > 0) && (
+        <div className="vtc-address-suggestions">
+          {loading && <div className="vtc-address-suggestion-loading">Recherche d'adresses…</div>}
+          {!loading && suggestions.map((s, i) => (
+            <button
+              type="button"
+              key={i}
+              className="vtc-address-suggestion"
+              onClick={() => { onChange(s.label); setSuggestions([]); setOpen(false); }}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Booking form
 // ---------------------------------------------------------------------------
 function Booking({ trip, setTrip, onBack, onNext }) {
@@ -723,25 +809,21 @@ function Booking({ trip, setTrip, onBack, onNext }) {
         />
       </div>
 
-      <div className="vtc-field">
-        <label><MapPin size={14} /> Adresse de départ</label>
-        <input
-          type="text"
-          placeholder="Ex. 12 rue de Paris, Saint-Quentin-en-Yvelines"
-          value={trip.pickup}
-          onChange={(e) => setTrip({ ...trip, pickup: e.target.value })}
-        />
-      </div>
+      <AddressField
+        label="Adresse de départ"
+        icon={<MapPin size={14} />}
+        placeholder="Ex. 12 rue de Paris, Saint-Quentin-en-Yvelines"
+        value={trip.pickup}
+        onChange={(v) => setTrip({ ...trip, pickup: v })}
+      />
 
-      <div className="vtc-field">
-        <label><Navigation size={14} /> Adresse d'arrivée</label>
-        <input
-          type="text"
-          placeholder="Ex. Aéroport d'Orly, Terminal 1"
-          value={trip.dropoff}
-          onChange={(e) => setTrip({ ...trip, dropoff: e.target.value })}
-        />
-      </div>
+      <AddressField
+        label="Adresse d'arrivée"
+        icon={<Navigation size={14} />}
+        placeholder="Ex. Aéroport d'Orly, Terminal 1"
+        value={trip.dropoff}
+        onChange={(v) => setTrip({ ...trip, dropoff: v })}
+      />
 
       <div className="vtc-field">
         <label><Clock size={14} /> Prise en charge souhaitée</label>
@@ -1687,6 +1769,21 @@ function Style() {
       .vtc-field input:focus { border-color: var(--vtc-accent); }
       .vtc-field-row { display: flex; gap: 12px; }
       .vtc-field-row .vtc-field { flex: 1; }
+
+      .vtc-address-field { position: relative; }
+      .vtc-address-suggestions {
+        position: absolute; top: 100%; left: 0; right: 0; margin-top: 4px; z-index: 30;
+        background: var(--vtc-surface); border: 1px solid var(--vtc-border); border-radius: 10px;
+        max-height: 230px; overflow-y: auto; box-shadow: 0 10px 24px rgba(11,42,74,0.12);
+      }
+      .vtc-address-suggestion {
+        display: block; width: 100%; text-align: left; background: transparent; border: none;
+        border-bottom: 1px solid var(--vtc-border); padding: 10px 12px; font-size: 13px; color: var(--vtc-text);
+        cursor: pointer; font-family: 'Inter', sans-serif;
+      }
+      .vtc-address-suggestion:last-child { border-bottom: none; }
+      .vtc-address-suggestion:hover { background: var(--vtc-surface-alt); }
+      .vtc-address-suggestion-loading { padding: 10px 12px; font-size: 12px; color: var(--vtc-text-muted); }
 
       .vtc-toggle { display: flex; background: var(--vtc-surface); border: 1px solid var(--vtc-border); border-radius: 10px; padding: 4px; }
       .vtc-toggle button { flex: 1; background: transparent; border: none; color: var(--vtc-text-muted); padding: 9px; border-radius: 7px; cursor: pointer; font-family: 'Inter', sans-serif; font-size: 13.5px; }
