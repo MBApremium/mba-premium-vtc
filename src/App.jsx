@@ -228,9 +228,9 @@ async function geocodeAddress(address) {
 
 // Coordonnées fixes pour les lieux fréquents — évite les échecs de géocodage sur ces trajets
 const KNOWN_LOCATIONS = [
-  { keys: ["disney village", "disneyland", "chessy"], lat: 48.8722, lng: 2.7859 },
-  { keys: ["charles de gaulle", "roissy-en-france", " cdg", "cdg,", "(cdg)"], lat: 49.0097, lng: 2.5479 },
-  { keys: ["paris-orly", "aéroport d'orly", "aeroport d'orly", "94390 orly"], lat: 48.7262, lng: 2.3652 },
+  { keys: ["disney village", "disneyland", "chessy", "disney"], lat: 48.8722, lng: 2.7859 },
+  { keys: ["charles de gaulle", "roissy-en-france", "roissy", " cdg", "cdg,", "(cdg)", "cdg "], lat: 49.0097, lng: 2.5479 },
+  { keys: ["paris-orly", "aéroport d'orly", "aeroport d'orly", "94390 orly", "orly"], lat: 48.7262, lng: 2.3652 },
   { keys: ["beauvais"], lat: 49.4544, lng: 2.1128 },
   { keys: ["châtelet", "chatelet"], lat: 48.8583, lng: 2.3470 },
 ];
