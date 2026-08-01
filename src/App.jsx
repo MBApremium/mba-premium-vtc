@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, createContext, useContext } from "r
 import {
   MapPin, Clock, CreditCard, Car, CheckCircle2, ChevronLeft,
   Calendar, Star, Navigation, Loader2, History, Settings, X, Plus,
-  Plane, Building2, Sparkles, ShoppingBag
+  Plane, Building2, Sparkles, ShoppingBag, Ticket
 } from "lucide-react";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
@@ -330,6 +330,10 @@ const STRINGS = {
     trustShoppingTag: "Shopping de luxe",
     trustAirportOrly: "Aéroport d'Orly",
     trustAirportOrlyTag: "Hub international",
+    trustAsterix: "Parc Astérix",
+    trustAsterixTag: "Parc à thème",
+    trustBeauvais: "Aéroport de Beauvais",
+    trustBeauvaisTag: "Vols low-cost",
   },
   en: {
     eyebrow: "Live booking",
@@ -379,6 +383,10 @@ const STRINGS = {
     trustShoppingTag: "Luxury shopping",
     trustAirportOrly: "Orly Airport",
     trustAirportOrlyTag: "International hub",
+    trustAsterix: "Parc Astérix",
+    trustAsterixTag: "Theme park",
+    trustBeauvais: "Beauvais Airport",
+    trustBeauvaisTag: "Low-cost flights",
   },
 };
 
@@ -692,12 +700,13 @@ function TrustSection({ t }) {
     { icon: <Sparkles size={20} />, name: t("trustDisney"), tag: t("trustDisneyTag") },
     { icon: <ShoppingBag size={20} />, name: t("trustShopping"), tag: t("trustShoppingTag") },
     { icon: <Plane size={20} />, name: t("trustAirportOrly"), tag: t("trustAirportOrlyTag") },
+    { icon: <Ticket size={20} />, name: t("trustAsterix"), tag: t("trustAsterixTag") },
+    { icon: <Plane size={20} />, name: t("trustBeauvais"), tag: t("trustBeauvaisTag") },
   ];
   const looped = [...brands, ...brands];
 
   return (
     <section className="vtc-trust">
-      <h2>{t("trustTitle")}</h2>
       <p className="vtc-trust-sub">{t("trustSub")}</p>
       <div className="vtc-marquee">
         <div className="vtc-marquee-track">
@@ -1831,8 +1840,8 @@ function Style() {
       .vtc-topbar-right { display: flex; align-items: center; gap: 12px; }
       .vtc-lang-switch { display: flex; border: 1px solid var(--vtc-border); border-radius: 8px; overflow: hidden; }
       .vtc-lang-switch button {
-        background: var(--vtc-surface); border: none; color: var(--vtc-text-muted); font-size: 12px; font-weight: 600;
-        padding: 7px 10px; cursor: pointer; font-family: 'Inter', sans-serif; transition: all .15s;
+        background: var(--vtc-surface); border: none; color: var(--vtc-text-muted); font-size: 10px; font-weight: 600;
+        padding: 4px 7px; cursor: pointer; font-family: 'Inter', sans-serif; transition: all .15s;
       }
       .vtc-lang-switch button.is-active { background: var(--vtc-accent); color: #FFFFFF; }
       .vtc-wheel-btn { width: 40px; height: 40px; border-radius: 50%; background: #0B2A6B; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform .15s; }
@@ -1900,7 +1909,7 @@ function Style() {
 
       .vtc-trust { margin-top: 56px; padding-top: 36px; border-top: 1px solid var(--vtc-border); }
       .vtc-trust h2 { font-size: 26px; text-align: center; margin-bottom: 8px; }
-      .vtc-trust-sub { text-align: center; color: var(--vtc-text-muted); font-size: 13.5px; margin: 0 auto 28px; max-width: 480px; }
+      .vtc-trust-sub { text-align: center; color: #0B2A6B; font-weight: 500; font-size: 13.5px; margin: 0 auto 28px; max-width: 480px; }
       .vtc-marquee { overflow: hidden; width: 100%; mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
       .vtc-marquee-track { display: flex; gap: 18px; width: max-content; animation: vtc-marquee-scroll 22s linear infinite; }
       .vtc-marquee:hover .vtc-marquee-track { animation-play-state: paused; }
