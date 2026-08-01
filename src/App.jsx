@@ -728,16 +728,22 @@ function TopBar({ view, setView, onDriverSpace, driver, lang, setLang }) {
       </div>
       <div className="vtc-topbar-right">
         <div className="vtc-lang-switch">
-          <button className={lang === "fr" ? "is-active" : ""} onClick={() => setLang("fr")}>FR</button>
-          <button className={lang === "en" ? "is-active" : ""} onClick={() => setLang("en")}>EN</button>
+          <button className={lang === "fr" ? "is-active" : ""} onClick={() => setLang("fr")}>
+            <span>FR</span>
+            <span className="vtc-lang-flag">🇫🇷</span>
+          </button>
+          <button className={lang === "en" ? "is-active" : ""} onClick={() => setLang("en")}>
+            <span>EN</span>
+            <span className="vtc-lang-flag">🇬🇧</span>
+          </button>
         </div>
-        <button className="vtc-wheel-btn" onClick={onDriverSpace} title="Espace chauffeur">
-          <SteeringWheelIcon size={22} />
-        </button>
       </div>
     </header>
     <nav className="vtc-subnav">
       <button className={"vtc-brand-link vtc-brand-link-gold" + (view === "vip" ? " is-active" : "")} onClick={() => setView("vip")}>{t("vipLink")}</button>
+      <button className="vtc-wheel-btn" onClick={onDriverSpace} title="Espace chauffeur">
+        <SteeringWheelIcon size={18} />
+      </button>
       <button className={"vtc-brand-link" + (view === "contact" ? " is-active" : "")} onClick={() => setView("contact")}>{t("contactLink")}</button>
     </nav>
     </>
@@ -2100,14 +2106,14 @@ function Style() {
         display: flex; align-items: center; justify-content: space-between;
         padding: 12px 24px; border-bottom: 1px solid var(--vtc-border);
       }
-      .vtc-subnav { display: flex; gap: 20px; padding: 10px 24px; border-bottom: 1px solid var(--vtc-border); }
+      .vtc-subnav { display: flex; gap: 10px; padding: 10px 24px; border-bottom: 1px solid var(--vtc-border); }
       .vtc-brand-link {
-        background: none; border: none; color: var(--vtc-text-muted); font-size: 12.5px; font-weight: 600;
-        cursor: pointer; padding: 0; font-family: 'Inter', sans-serif;
+        background: var(--vtc-surface); border: 1px solid var(--vtc-border); color: var(--vtc-text); font-size: 12.5px; font-weight: 600;
+        cursor: pointer; padding: 6px 14px; border-radius: 8px; font-family: 'Inter', sans-serif; transition: all .15s;
       }
-      .vtc-brand-link:hover, .vtc-brand-link.is-active { color: var(--vtc-accent); }
-      .vtc-brand-link-gold { color: #C9982E; }
-      .vtc-brand-link-gold:hover, .vtc-brand-link-gold.is-active { color: #A87C1F; }
+      .vtc-brand-link:hover, .vtc-brand-link.is-active { border-color: var(--vtc-accent); color: var(--vtc-accent); }
+      .vtc-brand-link-gold { background: #FBEFD8; border-color: #C9982E; color: #14100A; }
+      .vtc-brand-link-gold:hover, .vtc-brand-link-gold.is-active { background: #F5E3B8; border-color: #A87C1F; color: #14100A; }
 
       .vtc-panel-wide { max-width: 860px; }
       .vtc-contact-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; align-items: start; }
@@ -2131,9 +2137,11 @@ function Style() {
       .vtc-lang-switch button {
         background: var(--vtc-surface); border: none; color: var(--vtc-text-muted); font-size: 10px; font-weight: 600;
         padding: 4px 7px; cursor: pointer; font-family: 'Inter', sans-serif; transition: all .15s;
+        display: flex; flex-direction: column; align-items: center; gap: 2px;
       }
+      .vtc-lang-flag { font-size: 12px; line-height: 1; }
       .vtc-lang-switch button.is-active { background: var(--vtc-accent); color: #FFFFFF; }
-      .vtc-wheel-btn { width: 40px; height: 40px; border-radius: 50%; background: #0B2A6B; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform .15s; }
+      .vtc-wheel-btn { width: 30px; height: 30px; border-radius: 50%; background: #0B2A6B; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform .15s; }
       .vtc-wheel-btn svg { stroke: #FFFFFF; }
       .vtc-wheel-btn svg circle:last-of-type { fill: #FFFFFF; }
       .vtc-wheel-btn:hover { transform: scale(1.06); }
