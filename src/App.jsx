@@ -293,6 +293,39 @@ const STRINGS = {
     clientNamePlaceholder: "Jean Dupont",
     phoneLabel: "Numéro de téléphone",
     phonePlaceholder: "06 12 34 56 78",
+    passengersLabel: "Nombre de personnes",
+    vipLink: "Disneyland",
+    contactLink: "Contact",
+    vipTitle: "Disneyland",
+    vipSub: "Sélectionnez votre trajet vers Disneyland Paris.",
+    routeCdg: "CDG → Disneyland",
+    routeOrly: "Orly → Disneyland",
+    routeBeauvais: "Beauvais → Disneyland",
+    routeParis: "Paris → Disneyland",
+    contactTitle: "Envoyez-nous un message",
+    contactFirstName: "Prénom",
+    contactLastName: "Nom de famille",
+    contactEmail: "Adresse courriel",
+    contactPhone: "Numéro de téléphone",
+    contactSubject: "Sujet",
+    contactSubjectPlaceholder: "Choisissez un sujet…",
+    contactSubjectOptions: ["Réservation", "Question générale", "Réclamation", "Partenariat", "Autre"],
+    contactMessage: "Votre message",
+    contactSend: "Envoyer un message",
+    contactSending: "Envoi en cours…",
+    contactFineprint: "Nous répondons en moins de 30 minutes · Vos données ne sont jamais partagées",
+    contactSuccessTitle: "Message envoyé ✅",
+    contactSuccessSub: "Merci, nous vous répondrons rapidement.",
+    contactInfoTitle: "Coordonnées",
+    contactInfoPhone: "Téléphone et WhatsApp",
+    contactInfoEmail: "E-mail",
+    contactInfoZone: "Zone d'opération",
+    contactInfoZoneValue: "Paris et Île-de-France, France",
+    contactInfoAvailability: "Disponibilité",
+    contactInfoAvailabilityValue: "24 heures sur 24, 7 jours sur 7",
+    contactInfoResponse: "Temps de réponse",
+    contactInfoResponseValue: "Dans les 30 minutes (heures ouvrables)",
+    contactWhatsappNote: "Vous préférez WhatsApp ? Envoyez-nous un message directement pour une réponse plus rapide.",
     pickupLabel: "Adresse de départ",
     pickupPlaceholder: "Ex. 12 rue de Paris, Saint-Quentin-en-Yvelines",
     dropoffLabel: "Adresse d'arrivée",
@@ -346,6 +379,39 @@ const STRINGS = {
     clientNamePlaceholder: "Jean Dupont",
     phoneLabel: "Phone number",
     phonePlaceholder: "+33 6 12 34 56 78",
+    passengersLabel: "Number of passengers",
+    vipLink: "Disneyland",
+    contactLink: "Contact",
+    vipTitle: "Disneyland",
+    vipSub: "Select your route to Disneyland Paris.",
+    routeCdg: "CDG → Disneyland",
+    routeOrly: "Orly → Disneyland",
+    routeBeauvais: "Beauvais → Disneyland",
+    routeParis: "Paris → Disneyland",
+    contactTitle: "Send us a message",
+    contactFirstName: "First name",
+    contactLastName: "Last name",
+    contactEmail: "Email address",
+    contactPhone: "Phone number",
+    contactSubject: "Subject",
+    contactSubjectPlaceholder: "Choose a subject…",
+    contactSubjectOptions: ["Booking", "General question", "Complaint", "Partnership", "Other"],
+    contactMessage: "Your message",
+    contactSend: "Send message",
+    contactSending: "Sending…",
+    contactFineprint: "We reply within 30 minutes · Your data is never shared",
+    contactSuccessTitle: "Message sent ✅",
+    contactSuccessSub: "Thank you, we'll get back to you shortly.",
+    contactInfoTitle: "Contact details",
+    contactInfoPhone: "Phone and WhatsApp",
+    contactInfoEmail: "Email",
+    contactInfoZone: "Service area",
+    contactInfoZoneValue: "Paris and Île-de-France, France",
+    contactInfoAvailability: "Availability",
+    contactInfoAvailabilityValue: "24/7",
+    contactInfoResponse: "Response time",
+    contactInfoResponseValue: "Within 30 minutes (business hours)",
+    contactWhatsappNote: "Prefer WhatsApp? Message us directly for a faster reply.",
     pickupLabel: "Pickup address",
     pickupPlaceholder: "E.g. 12 rue de Paris, Saint-Quentin-en-Yvelines",
     dropoffLabel: "Drop-off address",
@@ -414,10 +480,10 @@ const DRIVER_PASSWORD = "Mahdi1234!";
 const WHATSAPP_NUMBER = "33609254801";
 
 export default function App() {
-  const [view, setView] = useState("home"); // home | booking | payment | history | driverspace | track
+  const [view, setView] = useState("home"); // home | booking | payment | history | driverspace | track | contact | vip
   const [lang, setLang] = useState("fr");
-  const [driver, setDriver] = useState({ name: "Votre chauffeur", vehicle: "Peugeot 508", plate: "AB-123-CD", rating: 4.9, siret: "", kbis: "", address: "", email: "mbapremiumfr@gmail.com" });
-  const [trip, setTrip] = useState({ pickup: "", dropoff: "", mode: "later", date: "", time: "", clientName: "", clientPhone: "" });
+  const [driver, setDriver] = useState({ name: "Votre chauffeur", vehicle: "Peugeot 508", plate: "AB-123-CD", rating: 4.9, siret: "", kbis: "", address: "", email: "mbapremiumfr@gmail.com", phone: "+33609254801" });
+  const [trip, setTrip] = useState({ pickup: "", dropoff: "", mode: "later", date: "", time: "", clientName: "", clientPhone: "", passengers: 1 });
   const [estimate, setEstimate] = useState(null);
   const [courseNumber, setCourseNumber] = useState("");
   const [currentRecordId, setCurrentRecordId] = useState(null);
@@ -505,6 +571,7 @@ export default function App() {
       time: trip.time,
       clientName: trip.clientName,
       clientPhone: trip.clientPhone,
+      passengers: trip.passengers,
       clientEmail: "",
       ...est,
       paymentMethod: "",
@@ -594,6 +661,16 @@ export default function App() {
           />
         )}
         {view === "track" && <TrackStatus bookings={bookings} onHome={() => setView("home")} />}
+        {view === "contact" && <ContactPage driver={driver} onHome={() => setView("home")} />}
+        {view === "vip" && (
+          <VipPage
+            onHome={() => setView("home")}
+            onSelectRoute={(pickup, dropoff) => {
+              setTrip((t) => ({ ...t, pickup, dropoff }));
+              setView("booking");
+            }}
+          />
+        )}
         {view === "driverspace" && (
           <DriverSpace
             bookings={bookings}
@@ -638,13 +715,20 @@ function WhatsAppButton() {
 // Top bar
 // ---------------------------------------------------------------------------
 function TopBar({ view, setView, onDriverSpace, driver, lang, setLang }) {
+  const { t } = useLang();
   return (
     <header className="vtc-topbar">
-      <div className="vtc-brand" onClick={() => setView("home")}>
-        <img src={LOGO_SRC} alt="MBA Premium" className="vtc-brand-mark" />
-        <div className="vtc-brand-text">
-          <span>MBA <em>Premium</em></span>
-          <small>Mindful.Business.Assurance</small>
+      <div className="vtc-brand-col">
+        <div className="vtc-brand" onClick={() => setView("home")}>
+          <img src={LOGO_SRC} alt="MBA Premium" className="vtc-brand-mark" />
+          <div className="vtc-brand-text">
+            <span>MBA <em>Premium</em></span>
+            <small>Mindful.Business.Assurance</small>
+          </div>
+        </div>
+        <div className="vtc-brand-links">
+          <button className={"vtc-brand-link" + (view === "vip" ? " is-active" : "")} onClick={() => setView("vip")}>{t("vipLink")}</button>
+          <button className={"vtc-brand-link" + (view === "contact" ? " is-active" : "")} onClick={() => setView("contact")}>{t("contactLink")}</button>
         </div>
       </div>
       <div className="vtc-topbar-right">
@@ -972,6 +1056,17 @@ function Booking({ trip, setTrip, onBack, onNext }) {
         />
       </div>
 
+      <div className="vtc-field">
+        <label>{t("passengersLabel")}</label>
+        <input
+          type="number"
+          min="1"
+          max="8"
+          value={trip.passengers}
+          onChange={(e) => setTrip({ ...trip, passengers: Math.max(1, Math.min(8, parseInt(e.target.value, 10) || 1)) })}
+        />
+      </div>
+
       <AddressField
         label={t("pickupLabel")}
         icon={<MapPin size={14} />}
@@ -1053,6 +1148,7 @@ function Payment({ trip, estimate, courseNumber, driverEmail, onBack, onEmailAtt
       `Société : MBA Premium\n` +
       `Réservation effectuée le ${reservedAt.toLocaleDateString("fr-FR")} à ${reservedAt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}\n` +
       `Client : ${trip.clientName || "(non renseigné)"}\n` +
+      `Nombre de personnes : ${trip.passengers}\n` +
       `Email du client : ${clientEmail}\n\n` +
       `Départ : ${trip.pickup}\n` +
       `Arrivée : ${trip.dropoff}\n` +
@@ -1419,6 +1515,7 @@ function Document({ type, booking, driver, onClose }) {
             <p>{booking.clientName || "Client MBA Premium"}</p>
             {booking.clientPhone && <p>{booking.clientPhone}</p>}
             {booking.clientEmail && <p>{booking.clientEmail}</p>}
+            {booking.passengers && <p>{booking.passengers} passager{booking.passengers > 1 ? "s" : ""}</p>}
           </div>
         </div>
 
@@ -1620,6 +1717,158 @@ function ConfirmPaymentTool({ bookings, onHome, onConfirm }) {
 }
 
 // ---------------------------------------------------------------------------
+// Contact
+// ---------------------------------------------------------------------------
+function ContactPage({ driver, onHome }) {
+  const { t } = useLang();
+  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "", subject: "", message: "" });
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
+
+  const canSend = form.firstName.trim() && form.lastName.trim() && form.email.includes("@") && form.subject && form.message.trim();
+
+  async function submit() {
+    setSending(true);
+    setError("");
+    const subject = `Contact — ${form.subject} (${form.firstName} ${form.lastName})`;
+    const message =
+      `Nouveau message depuis le formulaire de contact :\n\n` +
+      `Prénom : ${form.firstName}\n` +
+      `Nom : ${form.lastName}\n` +
+      `Email : ${form.email}\n` +
+      `Téléphone : ${form.phone || "(non renseigné)"}\n` +
+      `Sujet : ${form.subject}\n\n` +
+      `Message :\n${form.message}`;
+    try {
+      await sendRealEmail(subject, message, driver.email);
+      setSent(true);
+    } catch (e) {
+      setError("Échec de l'envoi. Réessayez ou contactez-nous sur WhatsApp.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="vtc-panel vtc-panel-wide">
+      <PanelHeader title={t("contactTitle")} onBack={onHome} />
+
+      <div className="vtc-contact-grid">
+        <div className="vtc-contact-form">
+          {sent ? (
+            <div className="vtc-check-mail">
+              <span className="vtc-check-mail-title">{t("contactSuccessTitle")}</span>
+              <span className="vtc-check-mail-sub">{t("contactSuccessSub")}</span>
+            </div>
+          ) : (
+            <>
+              <div className="vtc-field-row">
+                <div className="vtc-field">
+                  <label>{t("contactFirstName")} *</label>
+                  <input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
+                </div>
+                <div className="vtc-field">
+                  <label>{t("contactLastName")} *</label>
+                  <input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
+                </div>
+              </div>
+              <div className="vtc-field-row">
+                <div className="vtc-field">
+                  <label>{t("contactEmail")} *</label>
+                  <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                </div>
+                <div className="vtc-field">
+                  <label>{t("contactPhone")}</label>
+                  <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                </div>
+              </div>
+              <div className="vtc-field">
+                <label>{t("contactSubject")} *</label>
+                <select value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })}>
+                  <option value="">{t("contactSubjectPlaceholder")}</option>
+                  {t("contactSubjectOptions").map((opt) => (
+                    <option value={opt} key={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="vtc-field">
+                <label>{t("contactMessage")} *</label>
+                <textarea rows={5} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
+              </div>
+
+              {error && <p className="vtc-fineprint" style={{ color: "#c0392b" }}>{error}</p>}
+
+              <button className="vtc-cta vtc-cta-block" disabled={!canSend || sending} onClick={submit}>
+                {sending ? t("contactSending") : t("contactSend")}
+              </button>
+              <p className="vtc-fineprint">{t("contactFineprint")}</p>
+            </>
+          )}
+        </div>
+
+        <div className="vtc-contact-info">
+          <h3>{t("contactInfoTitle")}</h3>
+          <div className="vtc-contact-info-block">
+            <span className="vtc-doc-label">{t("contactInfoPhone")}</span>
+            <p>{driver.phone || `+${WHATSAPP_NUMBER}`}</p>
+          </div>
+          <div className="vtc-contact-info-block">
+            <span className="vtc-doc-label">{t("contactInfoEmail")}</span>
+            <p>{driver.email}</p>
+          </div>
+          <div className="vtc-contact-info-block">
+            <span className="vtc-doc-label">{t("contactInfoZone")}</span>
+            <p>{t("contactInfoZoneValue")}</p>
+          </div>
+          <div className="vtc-contact-info-block">
+            <span className="vtc-doc-label">{t("contactInfoAvailability")}</span>
+            <p>{t("contactInfoAvailabilityValue")}</p>
+          </div>
+          <div className="vtc-contact-info-block">
+            <span className="vtc-doc-label">{t("contactInfoResponse")}</span>
+            <p>{t("contactInfoResponseValue")}</p>
+          </div>
+          <p className="vtc-fineprint" style={{ marginTop: 12 }}>{t("contactWhatsappNote")}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Services VIP
+// ---------------------------------------------------------------------------
+function VipPage({ onHome, onSelectRoute }) {
+  const { t } = useLang();
+  const routes = [
+    { label: t("routeCdg"), pickup: "Aéroport Charles de Gaulle (CDG), Roissy-en-France" },
+    { label: t("routeOrly"), pickup: "Aéroport de Paris-Orly" },
+    { label: t("routeBeauvais"), pickup: "Aéroport de Beauvais-Tillé" },
+    { label: t("routeParis"), pickup: "Paris" },
+  ];
+  const dropoff = "Disneyland Paris, Chessy";
+
+  return (
+    <div className="vtc-panel">
+      <PanelHeader title={t("vipTitle")} onBack={onHome} />
+      <p className="vtc-sub">{t("vipSub")}</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {routes.map((r) => (
+          <button
+            key={r.label}
+            className="vtc-cta vtc-cta-block vtc-cta-gold"
+            onClick={() => onSelectRoute(r.pickup, dropoff)}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // TrackStatus — le client suit sa réservation avec son numéro de course
 // ---------------------------------------------------------------------------
 function TrackStatus({ bookings, onHome }) {
@@ -1760,7 +2009,7 @@ function Lookup({ bookings, onHome, onViewOrder, onViewInvoice }) {
 }
 
 function SettingsModal({ driver, onSave, onClose }) {
-  const [form, setForm] = useState({ siret: "", kbis: "", address: "", email: "", ...driver });
+  const [form, setForm] = useState({ siret: "", kbis: "", address: "", email: "", phone: "", ...driver });
   return (
     <div className="vtc-modal-backdrop" onClick={onClose}>
       <div className="vtc-modal" onClick={(e) => e.stopPropagation()}>
@@ -1775,6 +2024,10 @@ function SettingsModal({ driver, onSave, onClose }) {
         <div className="vtc-field">
           <label>Email (réception des bons de commande)</label>
           <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        </div>
+        <div className="vtc-field">
+          <label>Téléphone (affiché sur la page Contact)</label>
+          <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
         </div>
         <div className="vtc-field">
           <label>Véhicule</label>
@@ -1847,6 +2100,26 @@ function Style() {
         display: flex; align-items: center; justify-content: space-between;
         padding: 12px 24px; border-bottom: 1px solid var(--vtc-border);
       }
+      .vtc-brand-col { display: flex; flex-direction: column; gap: 4px; }
+      .vtc-brand-links { display: flex; gap: 14px; padding-left: 2px; }
+      .vtc-brand-link {
+        background: none; border: none; color: var(--vtc-text-muted); font-size: 11.5px; font-weight: 600;
+        cursor: pointer; padding: 0; font-family: 'Inter', sans-serif;
+      }
+      .vtc-brand-link:hover, .vtc-brand-link.is-active { color: var(--vtc-accent); }
+
+      .vtc-panel-wide { max-width: 860px; }
+      .vtc-contact-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; align-items: start; }
+      @media (max-width: 720px) { .vtc-contact-grid { grid-template-columns: 1fr; } }
+      .vtc-contact-form textarea, .vtc-contact-form select {
+        width: 100%; background: var(--vtc-surface); border: 1px solid var(--vtc-border); color: var(--vtc-text);
+        padding: 12px 14px; border-radius: 10px; font-size: 14px; font-family: 'Inter', sans-serif; outline: none; resize: vertical;
+      }
+      .vtc-contact-form select:focus, .vtc-contact-form textarea:focus { border-color: var(--vtc-accent); }
+      .vtc-contact-info { background: var(--vtc-surface); border: 1px solid var(--vtc-border); border-radius: 14px; padding: 20px; }
+      .vtc-contact-info h3 { font-size: 15px; margin-bottom: 14px; }
+      .vtc-contact-info-block { margin-bottom: 14px; }
+      .vtc-contact-info-block p { font-size: 13.5px; font-weight: 600; margin-top: 3px; }
       .vtc-brand { display: flex; align-items: center; gap: 10px; font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px; cursor: pointer; }
       .vtc-brand em { font-style: normal; color: var(--vtc-accent); }
       .vtc-brand-mark { width: 84px; height: 84px; object-fit: contain; }
