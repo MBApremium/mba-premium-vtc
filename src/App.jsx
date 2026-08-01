@@ -623,7 +623,7 @@ export default function App() {
 }
 
 function WhatsAppButton() {
-  const message = "Bonjour, je vous contacte depuis l'application MBA Premium.";
+  const message = "Bonjour, j'ai une question concernant ma réservation sur l'application MBA Premium.";
   const href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
   return (
     <a href={href} target="_blank" rel="noopener noreferrer" className="vtc-whatsapp-btn" title="Discuter sur WhatsApp">
