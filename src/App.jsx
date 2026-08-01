@@ -950,8 +950,8 @@ function MapCard() {
         </g>
 
         {/* Aéroport */}
-        <g transform="translate(80,178)" fill="#5B6B7A">
-          <path d="M13,0 L15,10 L26,15 L26,17 L15,14 L15,21 L19,24 L19,26 L13,24 L7,26 L7,24 L11,21 L11,14 L0,17 L0,15 L11,10 Z" />
+        <g transform="translate(85,180) scale(1.15)" fill="#5B6B7A">
+          <path d="M0,-2 L2,-1 L2,10 L14,17 L14,20 L2,17 L2,24 L6,27 L6,29 L0,27.5 L-6,29 L-6,27 L-2,24 L-2,17 L-14,20 L-14,17 L-2,10 L-2,-1 Z" />
         </g>
 
         <path
