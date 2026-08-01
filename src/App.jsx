@@ -1847,7 +1847,7 @@ function VipPage({ onHome, onSelectRoute }) {
     { label: t("routeBeauvais"), pickup: "Aéroport de Beauvais-Tillé" },
     { label: t("routeParis"), pickup: "Paris" },
   ];
-  const dropoff = "Disneyland Paris, Chessy";
+  const dropoff = "Disney Village, 2 Av. Paul Séramy, 77700 Chessy";
 
   return (
     <div className="vtc-panel">
