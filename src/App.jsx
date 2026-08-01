@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
 import {
   MapPin, Clock, CreditCard, Car, CheckCircle2, ChevronLeft,
-  Calendar, Star, Navigation, Loader2, History, Settings, X, Plus
+  Calendar, Star, Navigation, Loader2, History, Settings, X, Plus,
+  Plane, Building2, Sparkles, ShoppingBag
 } from "lucide-react";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
@@ -317,6 +318,18 @@ const STRINGS = {
     checkMailSub: (price, email) => `La réservation est envoyée à notre service de paiement. Vous allez recevoir un lien de paiement de ${price} à l'adresse ${email}.`,
     paymentFineprint: "Le chauffeur reçoit le bon de commande par email et vous envoie ensuite le lien de paiement sur votre adresse mail saisie.",
     driverSpace: "Espace chauffeur",
+    trustTitle: "Ils nous font confiance",
+    trustSub: "Nous accompagnons nos clients vers ces destinations, en toute fiabilité.",
+    trustAirportCdg: "Aéroport CDG",
+    trustAirportCdgTag: "Hub international",
+    trustHotels: "Hôtels de Paris",
+    trustHotelsTag: "Grands groupes hôteliers",
+    trustDisney: "Disneyland Paris",
+    trustDisneyTag: "Parc à thème",
+    trustShopping: "La Vallée Village",
+    trustShoppingTag: "Shopping de luxe",
+    trustAirportOrly: "Aéroport d'Orly",
+    trustAirportOrlyTag: "Hub international",
   },
   en: {
     eyebrow: "Live booking",
@@ -354,6 +367,18 @@ const STRINGS = {
     checkMailSub: (price, email) => `Your booking has been sent to our payment service. You will receive a payment link for ${price} at ${email}.`,
     paymentFineprint: "The driver receives the order by email and will then send you the payment link at the email address you entered.",
     driverSpace: "Driver area",
+    trustTitle: "Trusted by Leading Brands",
+    trustSub: "We proudly bring our clients to these world-class destinations.",
+    trustAirportCdg: "Paris CDG Airport",
+    trustAirportCdgTag: "International hub",
+    trustHotels: "Paris Hotels",
+    trustHotelsTag: "Major hotel groups",
+    trustDisney: "Disneyland Paris",
+    trustDisneyTag: "Theme park",
+    trustShopping: "La Vallée Village",
+    trustShoppingTag: "Luxury shopping",
+    trustAirportOrly: "Orly Airport",
+    trustAirportOrlyTag: "International hub",
   },
 };
 
@@ -654,7 +679,38 @@ function Home({ driver, onBook, onTrack, bookings }) {
 
         <MapCard />
       </section>
+
+      <TrustSection t={t} />
     </div>
+  );
+}
+
+function TrustSection({ t }) {
+  const brands = [
+    { icon: <Plane size={20} />, name: t("trustAirportCdg"), tag: t("trustAirportCdgTag") },
+    { icon: <Building2 size={20} />, name: t("trustHotels"), tag: t("trustHotelsTag") },
+    { icon: <Sparkles size={20} />, name: t("trustDisney"), tag: t("trustDisneyTag") },
+    { icon: <ShoppingBag size={20} />, name: t("trustShopping"), tag: t("trustShoppingTag") },
+    { icon: <Plane size={20} />, name: t("trustAirportOrly"), tag: t("trustAirportOrlyTag") },
+  ];
+  const looped = [...brands, ...brands];
+
+  return (
+    <section className="vtc-trust">
+      <h2>{t("trustTitle")}</h2>
+      <p className="vtc-trust-sub">{t("trustSub")}</p>
+      <div className="vtc-marquee">
+        <div className="vtc-marquee-track">
+          {looped.map((b, i) => (
+            <div className="vtc-trust-card" key={i}>
+              <div className="vtc-trust-icon">{b.icon}</div>
+              <div className="vtc-trust-name">{b.name}</div>
+              <div className="vtc-trust-tag">{b.tag}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -1841,6 +1897,18 @@ function Style() {
       .vtc-track-addr span:not(.vtc-recent-arrow) { color: var(--vtc-text); }
 
       .vtc-recent { margin-top: 40px; }
+
+      .vtc-trust { margin-top: 56px; padding-top: 36px; border-top: 1px solid var(--vtc-border); }
+      .vtc-trust h2 { font-size: 26px; text-align: center; margin-bottom: 8px; }
+      .vtc-trust-sub { text-align: center; color: var(--vtc-text-muted); font-size: 13.5px; margin: 0 auto 28px; max-width: 480px; }
+      .vtc-marquee { overflow: hidden; width: 100%; mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+      .vtc-marquee-track { display: flex; gap: 18px; width: max-content; animation: vtc-marquee-scroll 22s linear infinite; }
+      .vtc-marquee:hover .vtc-marquee-track { animation-play-state: paused; }
+      @keyframes vtc-marquee-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+      .vtc-trust-card { flex: 0 0 auto; width: 168px; background: var(--vtc-surface); border: 1px solid var(--vtc-border); border-radius: 14px; padding: 20px 16px; text-align: center; }
+      .vtc-trust-icon { width: 44px; height: 44px; border-radius: 50%; background: var(--vtc-surface-alt); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; color: var(--vtc-accent); }
+      .vtc-trust-name { font-weight: 600; font-size: 13.5px; }
+      .vtc-trust-tag { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--vtc-text-muted); margin-top: 4px; }
       .vtc-recent h3 { font-size: 15px; margin-bottom: 12px; color: var(--vtc-text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
       .vtc-recent-list { display: flex; flex-direction: column; gap: 8px; }
       .vtc-recent-item { display: flex; align-items: center; gap: 10px; background: var(--vtc-surface); border: 1px solid var(--vtc-border); padding: 12px 14px; border-radius: 10px; color: var(--vtc-text-muted); }
