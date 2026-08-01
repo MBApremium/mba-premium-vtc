@@ -411,6 +411,7 @@ function normalizeCourseNumber(s) {
 }
 
 const DRIVER_PASSWORD = "Mahdi1234!";
+const WHATSAPP_NUMBER = "33609254801";
 
 export default function App() {
   const [view, setView] = useState("home"); // home | booking | payment | history | driverspace | track
@@ -614,8 +615,22 @@ export default function App() {
       {showSettings && (
         <SettingsModal driver={driver} onSave={(d) => { persistDriver(d); setShowSettings(false); }} onClose={() => setShowSettings(false)} />
       )}
+
+      <WhatsAppButton />
     </div>
     </LangContext.Provider>
+  );
+}
+
+function WhatsAppButton() {
+  const message = "Bonjour, je vous contacte depuis l'application MBA Premium.";
+  const href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="vtc-whatsapp-btn" title="Discuter sur WhatsApp">
+      <svg viewBox="0 0 32 32" width="26" height="26" fill="#FFFFFF">
+        <path d="M16.02 3C9.4 3 4 8.4 4 15.02c0 2.25.62 4.36 1.7 6.17L3 29l7.98-2.62a12.1 12.1 0 0 0 5.04 1.1h.01c6.62 0 12.02-5.4 12.02-12.02C28.05 8.42 22.65 3 16.02 3zm0 21.98h-.01a9.9 9.9 0 0 1-5.06-1.39l-.36-.21-4.73 1.55 1.56-4.6-.24-.38a9.85 9.85 0 0 1-1.5-5.25c0-5.46 4.44-9.9 9.9-9.9 2.64 0 5.13 1.03 6.99 2.9a9.83 9.83 0 0 1 2.9 6.99c0 5.46-4.44 9.9-9.9 9.9zm5.43-7.41c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.25-.46-2.38-1.47-.88-.78-1.47-1.75-1.65-2.05-.17-.3-.02-.46.13-.6.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.6-.91-2.2-.24-.58-.49-.5-.67-.5-.17-.01-.37-.01-.57-.01s-.52.07-.8.37c-.27.3-1.05 1.02-1.05 2.5 0 1.47 1.08 2.9 1.23 3.1.15.2 2.12 3.24 5.15 4.54.72.31 1.28.5 1.72.64.72.23 1.38.2 1.9.12.58-.09 1.76-.72 2.01-1.41.25-.7.25-1.29.17-1.41-.07-.13-.27-.2-.57-.35z" />
+      </svg>
+    </a>
   );
 }
 
@@ -1848,6 +1863,13 @@ function Style() {
       .vtc-wheel-btn svg { stroke: #FFFFFF; }
       .vtc-wheel-btn svg circle:last-of-type { fill: #FFFFFF; }
       .vtc-wheel-btn:hover { transform: scale(1.06); }
+
+      .vtc-whatsapp-btn {
+        position: fixed; bottom: 22px; right: 22px; width: 56px; height: 56px; border-radius: 50%;
+        background: #25D366; display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 8px 20px rgba(37,211,102,0.4); z-index: 100; transition: transform .15s;
+      }
+      .vtc-whatsapp-btn:hover { transform: scale(1.07); }
       .vtc-hero-logo { width: 120px; height: auto; object-fit: contain; margin-bottom: 12px; }
       .vtc-nav { display: flex; gap: 8px; }
       .vtc-navbtn {
