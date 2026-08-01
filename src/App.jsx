@@ -740,11 +740,11 @@ function TopBar({ view, setView, onDriverSpace, driver, lang, setLang }) {
       </div>
     </header>
     <nav className="vtc-subnav">
-      <button className={"vtc-brand-link vtc-brand-link-gold" + (view === "vip" ? " is-active" : "")} onClick={() => setView("vip")}>{t("vipLink")}</button>
+      <button className={"vtc-cta vtc-cta-gold vtc-cta-sm" + (view === "vip" ? " is-active" : "")} onClick={() => setView("vip")}>{t("vipLink")}</button>
+      <button className={"vtc-brand-link" + (view === "contact" ? " is-active" : "")} onClick={() => setView("contact")}>{t("contactLink")}</button>
       <button className="vtc-wheel-btn" onClick={onDriverSpace} title="Espace chauffeur">
         <SteeringWheelIcon size={18} />
       </button>
-      <button className={"vtc-brand-link" + (view === "contact" ? " is-active" : "")} onClick={() => setView("contact")}>{t("contactLink")}</button>
     </nav>
     </>
   );
