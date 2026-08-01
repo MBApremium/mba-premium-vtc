@@ -119,7 +119,7 @@ async function generateOrderPDFBlob({ courseNumber, clientName, clientPhone, cli
   line(`Distance : ${distanceKm} km`);
   y += 4;
   doc.setFontSize(11);
-  line(`Total HT (${distanceKm} km × 2,00 €) : ${formatEUR(priceHT)}`);
+  line(`Total HT (${distanceKm} km × 1,50 €) : ${formatEUR(priceHT)}`);
   line(`TVA (10%) : ${formatEUR(tva)}`);
   doc.setFontSize(13);
   line(`Total TTC : ${formatEUR(price)}`);
@@ -164,7 +164,7 @@ async function generateInvoicePDFBlob({ courseNumber, clientName, clientPhone, c
   line(`Distance : ${distanceKm} km`);
   y += 4;
   doc.setFontSize(11);
-  line(`Total HT (${distanceKm} km × 2,00 €) : ${formatEUR(priceHT)}`);
+  line(`Total HT (${distanceKm} km × 1,50 €) : ${formatEUR(priceHT)}`);
   line(`TVA (10%) : ${formatEUR(tva)}`);
   doc.setFontSize(13);
   line(`Total TTC : ${formatEUR(price)}`);
@@ -194,7 +194,7 @@ function hashString(str) {
 
 function priceFromDistance(distanceKm, durationMin) {
   const roundedDistanceKm = Math.round(distanceKm * 10) / 10;
-  const priceHT = roundedDistanceKm * 2;
+  const priceHT = roundedDistanceKm * 1.5;
   const tva = priceHT * 0.10;
   const price = priceHT + tva;
   const durationMinLow = Math.max(1, Math.round(durationMin));
@@ -1200,7 +1200,7 @@ function Payment({ trip, estimate, courseNumber, driverEmail, onBack, onEmailAtt
       `Arrivée : ${trip.dropoff}\n` +
       `${trip.mode === "now" ? "Départ immédiat" : `Planifiée le ${trip.date} à ${trip.time}`}\n` +
       `Distance : ${estimate.distanceKm} km\n\n` +
-      `Total HT (${estimate.distanceKm} km × 2,00 €) : ${formatEUR(estimate.priceHT)}\n` +
+      `Total HT (${estimate.distanceKm} km × 1,50 €) : ${formatEUR(estimate.priceHT)}\n` +
       `TVA (10%) : ${formatEUR(estimate.tva)}\n` +
       `MONTANT TTC EXACT À DEMANDER : ${formatEUR(estimate.price)}\n\n` +
       `→ Envoyez le lien de paiement SumUp (carte bancaire) de ce montant exact à ${clientEmail}.`;
@@ -1579,7 +1579,7 @@ function Document({ type, booking, driver, onClose }) {
               <td>
                 {booking.pickup} → {booking.dropoff}
                 <br />
-                {booking.distanceKm} km × 2,00 €
+                {booking.distanceKm} km × 1,50 €
                 {booking.mode === "later" && booking.date ? ` · ${booking.date} ${booking.time}` : ""}
               </td>
               <td>{formatEUR(booking.priceHT)}</td>
