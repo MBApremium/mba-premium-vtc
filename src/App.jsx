@@ -742,7 +742,7 @@ function TopBar({ view, setView, onDriverSpace, driver, lang, setLang }) {
     <nav className="vtc-subnav">
       <button className={"vtc-cta vtc-cta-gold vtc-cta-sm" + (view === "vip" ? " is-active" : "")} onClick={() => setView("vip")}>{t("vipLink")}</button>
       <button className={"vtc-brand-link" + (view === "contact" ? " is-active" : "")} onClick={() => setView("contact")}>{t("contactLink")}</button>
-      <button className="vtc-wheel-btn" onClick={onDriverSpace} title="Espace chauffeur">
+      <button className="vtc-wheel-btn vtc-wheel-btn-right" onClick={onDriverSpace} title="Espace chauffeur">
         <SteeringWheelIcon size={18} />
       </button>
     </nav>
@@ -2145,6 +2145,7 @@ function Style() {
       .vtc-wheel-btn svg { stroke: #FFFFFF; }
       .vtc-wheel-btn svg circle:last-of-type { fill: #FFFFFF; }
       .vtc-wheel-btn:hover { transform: scale(1.06); }
+      .vtc-wheel-btn-right { margin-left: auto; }
 
       .vtc-whatsapp-btn {
         position: fixed; bottom: 22px; right: 22px; width: 56px; height: 56px; border-radius: 50%;
