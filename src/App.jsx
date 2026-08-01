@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, createContext, useContext } from "react";
 import {
   MapPin, Clock, CreditCard, Car, CheckCircle2, ChevronLeft,
   Calendar, Star, Navigation, Loader2, History, Settings, X, Plus
@@ -277,6 +277,92 @@ function formatEUR(n) {
   return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 }
 
+// ---------------------------------------------------------------------------
+// Langue (FR / EN) — traduit les écrans principaux du client
+// ---------------------------------------------------------------------------
+const STRINGS = {
+  fr: {
+    eyebrow: "Réservation en direct",
+    heroTitleLine1: "À l'heure, en toute",
+    heroTitleLine2: "sécurité. Toujours.",
+    heroSub: "Réservez votre chauffeur à l'avance, en toute tranquillité. Prix annoncé avant la course, paiement sécurisé par carte.",
+    bookCta: "Réserver une course",
+    bookingTitle: "Détails de la course",
+    clientNameLabel: "Nom du client (pour la facture)",
+    clientNamePlaceholder: "Jean Dupont",
+    phoneLabel: "Numéro de téléphone",
+    phonePlaceholder: "06 12 34 56 78",
+    pickupLabel: "Adresse de départ",
+    pickupPlaceholder: "Ex. 12 rue de Paris, Saint-Quentin-en-Yvelines",
+    dropoffLabel: "Adresse d'arrivée",
+    dropoffPlaceholder: "Ex. Aéroport d'Orly, Terminal 1",
+    pickupTimeLabel: "Prise en charge souhaitée",
+    dateLabel: "Date",
+    timeLabel: "Heure",
+    timingError: "La réservation doit être faite au moins 1 heure avant la prise en charge.",
+    timingNote: "Les courses se réservent uniquement à l'avance, au moins 1 heure avant l'heure de prise en charge.",
+    seeEstimate: "Voir le tarif estimé",
+    calculating: "Calcul de l'itinéraire…",
+    paymentTitle: "Paiement",
+    scheduledLabel: "Planifiée",
+    immediateLabel: "Départ immédiat",
+    trafficNote: "Durée variable selon la circulation",
+    simulatedNote: "Adresse non reconnue par le service cartographique — distance estimée approximativement.",
+    viewOrder: "Voir le bon de commande",
+    emailLabel: "Votre adresse email",
+    emailPlaceholder: "vous@exemple.com",
+    sendOrder: "Envoyer le bon de commande au chauffeur",
+    sending: "Envoi en cours…",
+    checkMailTitle: "Vérifiez votre adresse mail",
+    checkMailSub: (price, email) => `La réservation est envoyée à notre service de paiement. Vous allez recevoir un lien de paiement de ${price} à l'adresse ${email}.`,
+    paymentFineprint: "Le chauffeur reçoit le bon de commande par email et vous envoie ensuite le lien de paiement sur votre adresse mail saisie.",
+    driverSpace: "Espace chauffeur",
+  },
+  en: {
+    eyebrow: "Live booking",
+    heroTitleLine1: "On time, always",
+    heroTitleLine2: "safe and secure.",
+    heroSub: "Book your driver in advance, with total peace of mind. Price shown before the ride, secure card payment.",
+    bookCta: "Book a ride",
+    bookingTitle: "Ride details",
+    clientNameLabel: "Client name (for the invoice)",
+    clientNamePlaceholder: "Jean Dupont",
+    phoneLabel: "Phone number",
+    phonePlaceholder: "+33 6 12 34 56 78",
+    pickupLabel: "Pickup address",
+    pickupPlaceholder: "E.g. 12 rue de Paris, Saint-Quentin-en-Yvelines",
+    dropoffLabel: "Drop-off address",
+    dropoffPlaceholder: "E.g. Orly Airport, Terminal 1",
+    pickupTimeLabel: "Requested pickup time",
+    dateLabel: "Date",
+    timeLabel: "Time",
+    timingError: "The booking must be made at least 1 hour before pickup.",
+    timingNote: "Rides can only be booked in advance, at least 1 hour before pickup time.",
+    seeEstimate: "See estimated fare",
+    calculating: "Calculating route…",
+    paymentTitle: "Payment",
+    scheduledLabel: "Scheduled",
+    immediateLabel: "Immediate pickup",
+    trafficNote: "Duration may vary with traffic",
+    simulatedNote: "Address not recognized by the mapping service — distance estimated approximately.",
+    viewOrder: "View the order form",
+    emailLabel: "Your email address",
+    emailPlaceholder: "you@example.com",
+    sendOrder: "Send the order to the driver",
+    sending: "Sending…",
+    checkMailTitle: "Check your email",
+    checkMailSub: (price, email) => `Your booking has been sent to our payment service. You will receive a payment link for ${price} at ${email}.`,
+    paymentFineprint: "The driver receives the order by email and will then send you the payment link at the email address you entered.",
+    driverSpace: "Driver area",
+  },
+};
+
+const LangContext = createContext({ lang: "fr", t: (k) => STRINGS.fr[k] });
+
+function useLang() {
+  return useContext(LangContext);
+}
+
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
@@ -295,6 +381,7 @@ const DRIVER_PASSWORD = "Mahdi1234!";
 
 export default function App() {
   const [view, setView] = useState("home"); // home | booking | payment | history | driverspace | track
+  const [lang, setLang] = useState("fr");
   const [driver, setDriver] = useState({ name: "Votre chauffeur", vehicle: "Peugeot 508", plate: "AB-123-CD", rating: 4.9, siret: "", kbis: "", address: "", email: "mbapremiumfr@gmail.com" });
   const [trip, setTrip] = useState({ pickup: "", dropoff: "", mode: "later", date: "", time: "", clientName: "", clientPhone: "" });
   const [estimate, setEstimate] = useState(null);
@@ -441,10 +528,13 @@ export default function App() {
     return true;
   }
 
+  const t = (key) => (STRINGS[lang] && STRINGS[lang][key] !== undefined ? STRINGS[lang][key] : STRINGS.fr[key]);
+
   return (
+    <LangContext.Provider value={{ lang, t }}>
     <div className="vtc-root">
       <Style />
-      <TopBar view={view} setView={setView} onDriverSpace={() => setView("driverspace")} driver={driver} />
+      <TopBar view={view} setView={setView} onDriverSpace={() => setView("driverspace")} driver={driver} lang={lang} setLang={setLang} />
 
       <main className="vtc-main">
         {view === "home" && <Home driver={driver} onBook={goBooking} onTrack={() => setView("track")} bookings={bookings} />}
@@ -492,13 +582,14 @@ export default function App() {
         <SettingsModal driver={driver} onSave={(d) => { persistDriver(d); setShowSettings(false); }} onClose={() => setShowSettings(false)} />
       )}
     </div>
+    </LangContext.Provider>
   );
 }
 
 // ---------------------------------------------------------------------------
 // Top bar
 // ---------------------------------------------------------------------------
-function TopBar({ view, setView, onDriverSpace, driver }) {
+function TopBar({ view, setView, onDriverSpace, driver, lang, setLang }) {
   return (
     <header className="vtc-topbar">
       <div className="vtc-brand" onClick={() => setView("home")}>
@@ -508,9 +599,15 @@ function TopBar({ view, setView, onDriverSpace, driver }) {
           <small>Mindful.Business.Assurance</small>
         </div>
       </div>
-      <button className="vtc-wheel-btn" onClick={onDriverSpace} title="Espace chauffeur">
-        <SteeringWheelIcon size={22} />
-      </button>
+      <div className="vtc-topbar-right">
+        <div className="vtc-lang-switch">
+          <button className={lang === "fr" ? "is-active" : ""} onClick={() => setLang("fr")}>FR</button>
+          <button className={lang === "en" ? "is-active" : ""} onClick={() => setLang("en")}>EN</button>
+        </div>
+        <button className="vtc-wheel-btn" onClick={onDriverSpace} title="Espace chauffeur">
+          <SteeringWheelIcon size={22} />
+        </button>
+      </div>
     </header>
   );
 }
@@ -531,18 +628,18 @@ function SteeringWheelIcon({ size = 20, color = "#0B2A6B" }) {
 // Home / hero with signature route animation
 // ---------------------------------------------------------------------------
 function Home({ driver, onBook, onTrack, bookings }) {
+  const { t } = useLang();
   return (
     <div className="vtc-home">
       <section className="vtc-hero">
         <div className="vtc-hero-copy">
-          <span className="vtc-eyebrow">Réservation en direct</span>
-          <h1>À l'heure, en toute <br />sécurité. Toujours.</h1>
+          <span className="vtc-eyebrow">{t("eyebrow")}</span>
+          <h1>{t("heroTitleLine1")} <br />{t("heroTitleLine2")}</h1>
           <p className="vtc-sub">
-            Réservez votre chauffeur à l'avance, en toute tranquillité.
-            Prix annoncé avant la course, paiement sécurisé par carte.
+            {t("heroSub")}
           </p>
           <button className="vtc-cta vtc-cta-gold" onClick={onBook}>
-            Réserver une course <Navigation size={16} />
+            {t("bookCta")} <Navigation size={16} />
           </button>
 
           <div className="vtc-rating-badge">
@@ -557,25 +654,6 @@ function Home({ driver, onBook, onTrack, bookings }) {
 
         <MapCard />
       </section>
-
-      {bookings.length > 0 && (
-        <section className="vtc-recent">
-          <h3>Dernières courses</h3>
-          <div className="vtc-recent-list">
-            {bookings.slice(0, 3).map((b) => (
-              <div className="vtc-recent-item" key={b.id}>
-                <MapPin size={14} />
-                <div className="vtc-recent-text">
-                  <span>{b.pickup || "Départ"}</span>
-                  <span className="vtc-recent-arrow">→</span>
-                  <span>{b.dropoff || "Arrivée"}</span>
-                </div>
-                <span className="vtc-recent-price">{formatEUR(b.price)}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
     </div>
   );
 }
@@ -775,6 +853,7 @@ function AddressField({ label, icon, placeholder, value, onChange }) {
 // Booking form
 // ---------------------------------------------------------------------------
 function Booking({ trip, setTrip, onBack, onNext }) {
+  const { t } = useLang();
   const [calculating, setCalculating] = useState(false);
   const now = new Date();
   const pad = (n) => String(n).padStart(2, "0");
@@ -791,50 +870,50 @@ function Booking({ trip, setTrip, onBack, onNext }) {
 
   return (
     <div className="vtc-panel">
-      <PanelHeader title="Détails de la course" onBack={onBack} />
+      <PanelHeader title={t("bookingTitle")} onBack={onBack} />
 
       <div className="vtc-field">
-        <label>Nom du client (pour la facture)</label>
+        <label>{t("clientNameLabel")}</label>
         <input
           type="text"
-          placeholder="Jean Dupont"
+          placeholder={t("clientNamePlaceholder")}
           value={trip.clientName}
           onChange={(e) => setTrip({ ...trip, clientName: e.target.value })}
         />
       </div>
 
       <div className="vtc-field">
-        <label>Numéro de téléphone</label>
+        <label>{t("phoneLabel")}</label>
         <input
           type="tel"
-          placeholder="06 12 34 56 78"
+          placeholder={t("phonePlaceholder")}
           value={trip.clientPhone}
           onChange={(e) => setTrip({ ...trip, clientPhone: e.target.value })}
         />
       </div>
 
       <AddressField
-        label="Adresse de départ"
+        label={t("pickupLabel")}
         icon={<MapPin size={14} />}
-        placeholder="Ex. 12 rue de Paris, Saint-Quentin-en-Yvelines"
+        placeholder={t("pickupPlaceholder")}
         value={trip.pickup}
         onChange={(v) => setTrip({ ...trip, pickup: v })}
       />
 
       <AddressField
-        label="Adresse d'arrivée"
+        label={t("dropoffLabel")}
         icon={<Navigation size={14} />}
-        placeholder="Ex. Aéroport d'Orly, Terminal 1"
+        placeholder={t("dropoffPlaceholder")}
         value={trip.dropoff}
         onChange={(v) => setTrip({ ...trip, dropoff: v })}
       />
 
       <div className="vtc-field">
-        <label><Clock size={14} /> Prise en charge souhaitée</label>
+        <label><Clock size={14} /> {t("pickupTimeLabel")}</label>
       </div>
       <div className="vtc-field-row">
         <div className="vtc-field">
-          <label><Calendar size={14} /> Date</label>
+          <label><Calendar size={14} /> {t("dateLabel")}</label>
           <input
             type="date"
             min={todayStr}
@@ -843,7 +922,7 @@ function Booking({ trip, setTrip, onBack, onNext }) {
           />
         </div>
         <div className="vtc-field">
-          <label><Clock size={14} /> Heure</label>
+          <label><Clock size={14} /> {t("timeLabel")}</label>
           <input
             type="time"
             min={minTimeForSelectedDate}
@@ -855,11 +934,11 @@ function Booking({ trip, setTrip, onBack, onNext }) {
 
       {trip.date && trip.time && !isTimingValid && (
         <p className="vtc-fineprint" style={{ color: "#c0392b", textAlign: "left", marginTop: -8, marginBottom: 14 }}>
-          La réservation doit être faite au moins 1 heure avant la prise en charge.
+          {t("timingError")}
         </p>
       )}
       <p className="vtc-fineprint" style={{ textAlign: "left", marginTop: -8, marginBottom: 14 }}>
-        Les courses se réservent uniquement à l'avance, au moins 1 heure avant l'heure de prise en charge.
+        {t("timingNote")}
       </p>
 
       <button
@@ -867,7 +946,7 @@ function Booking({ trip, setTrip, onBack, onNext }) {
         disabled={!canNext || calculating}
         onClick={async () => { setCalculating(true); await onNext(); }}
       >
-        {calculating ? (<><Loader2 size={16} className="vtc-spin" /> Calcul de l'itinéraire…</>) : "Voir le tarif estimé"}
+        {calculating ? (<><Loader2 size={16} className="vtc-spin" /> {t("calculating")}</>) : t("seeEstimate")}
       </button>
     </div>
   );
@@ -877,6 +956,7 @@ function Booking({ trip, setTrip, onBack, onNext }) {
 // Payment (simulated card capture — see chat notes on real Stripe wiring)
 // ---------------------------------------------------------------------------
 function Payment({ trip, estimate, courseNumber, driverEmail, onBack, onEmailAttached, onViewOrder }) {
+  const { t, lang } = useLang();
   const [clientEmail, setClientEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
@@ -918,7 +998,7 @@ function Payment({ trip, estimate, courseNumber, driverEmail, onBack, onEmailAtt
 
   return (
     <div className="vtc-panel">
-      <PanelHeader title="Paiement" onBack={onBack} />
+      <PanelHeader title={t("paymentTitle")} onBack={onBack} />
 
       <div className="vtc-summary">
         <div className="vtc-summary-row">
@@ -927,24 +1007,24 @@ function Payment({ trip, estimate, courseNumber, driverEmail, onBack, onEmailAtt
           <span>{trip.dropoff}</span>
         </div>
         <div className="vtc-summary-meta">
-          {trip.mode === "now" ? "Départ immédiat" : `Planifiée · ${trip.date} à ${trip.time}`} · {estimate.distanceKm} km · {estimate.durationMinLow}–{estimate.durationMinHigh} min
+          {trip.mode === "now" ? t("immediateLabel") : `${t("scheduledLabel")} · ${trip.date} ${trip.time}`} · {estimate.distanceKm} km · {estimate.durationMinLow}–{estimate.durationMinHigh} min
         </div>
-        <div className="vtc-summary-meta" style={{ marginTop: 2 }}>Durée variable selon la circulation</div>
+        <div className="vtc-summary-meta" style={{ marginTop: 2 }}>{t("trafficNote")}</div>
         <div className="vtc-summary-price">{formatEUR(estimate.price)}</div>
         {estimate.simulated && (
           <div className="vtc-summary-meta" style={{ marginTop: 6, color: "#B8860B" }}>
-            Adresse non reconnue par le service cartographique — distance estimée approximativement.
+            {t("simulatedNote")}
           </div>
         )}
       </div>
 
-      <button className="vtc-link-btn" onClick={onViewOrder}>Voir le bon de commande</button>
+      <button className="vtc-link-btn" onClick={onViewOrder}>{t("viewOrder")}</button>
 
       <div className="vtc-field">
-        <label>Votre adresse email</label>
+        <label>{t("emailLabel")}</label>
         <input
           type="email"
-          placeholder="vous@exemple.com"
+          placeholder={t("emailPlaceholder")}
           value={clientEmail}
           onChange={(e) => setClientEmail(e.target.value)}
           disabled={sent || sending}
@@ -959,19 +1039,19 @@ function Payment({ trip, estimate, courseNumber, driverEmail, onBack, onEmailAtt
           disabled={!clientEmail.includes("@") || sending}
           onClick={sendOrderEmail}
         >
-          {sending ? (<><Loader2 size={16} className="vtc-spin" /> Envoi en cours…</>) : "Envoyer le bon de commande au chauffeur"}
+          {sending ? (<><Loader2 size={16} className="vtc-spin" /> {t("sending")}</>) : t("sendOrder")}
         </button>
       ) : (
         <div className="vtc-check-mail">
-          <span className="vtc-check-mail-title">Vérifiez votre adresse mail</span>
+          <span className="vtc-check-mail-title">{t("checkMailTitle")}</span>
           <span className="vtc-check-mail-sub">
-            La réservation est envoyée à notre service de paiement. Vous allez recevoir un lien de paiement de {formatEUR(estimate.price)} à l'adresse {clientEmail}.
+            {STRINGS[lang].checkMailSub(formatEUR(estimate.price), clientEmail)}
           </span>
         </div>
       )}
 
       <p className="vtc-fineprint">
-        Le chauffeur reçoit le bon de commande par email et vous envoie ensuite le lien de paiement sur votre adresse mail saisie.
+        {t("paymentFineprint")}
       </p>
     </div>
   );
@@ -1692,6 +1772,13 @@ function Style() {
       .vtc-brand-mark { width: 84px; height: 84px; object-fit: contain; }
       .vtc-brand-text { display: flex; flex-direction: column; line-height: 1.2; }
       .vtc-brand-text small { font-family: 'Inter', sans-serif; font-weight: 500; font-size: 10px; color: var(--vtc-text-muted); letter-spacing: .02em; }
+      .vtc-topbar-right { display: flex; align-items: center; gap: 12px; }
+      .vtc-lang-switch { display: flex; border: 1px solid var(--vtc-border); border-radius: 8px; overflow: hidden; }
+      .vtc-lang-switch button {
+        background: var(--vtc-surface); border: none; color: var(--vtc-text-muted); font-size: 12px; font-weight: 600;
+        padding: 7px 10px; cursor: pointer; font-family: 'Inter', sans-serif; transition: all .15s;
+      }
+      .vtc-lang-switch button.is-active { background: var(--vtc-accent); color: #FFFFFF; }
       .vtc-wheel-btn { width: 40px; height: 40px; border-radius: 50%; background: #0B2A6B; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform .15s; }
       .vtc-wheel-btn svg { stroke: #FFFFFF; }
       .vtc-wheel-btn svg circle:last-of-type { fill: #FFFFFF; }
