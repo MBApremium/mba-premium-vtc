@@ -717,18 +717,13 @@ function WhatsAppButton() {
 function TopBar({ view, setView, onDriverSpace, driver, lang, setLang }) {
   const { t } = useLang();
   return (
+    <>
     <header className="vtc-topbar">
-      <div className="vtc-brand-col">
-        <div className="vtc-brand" onClick={() => setView("home")}>
-          <img src={LOGO_SRC} alt="MBA Premium" className="vtc-brand-mark" />
-          <div className="vtc-brand-text">
-            <span>MBA <em>Premium</em></span>
-            <small>Mindful.Business.Assurance</small>
-          </div>
-        </div>
-        <div className="vtc-brand-links">
-          <button className={"vtc-brand-link" + (view === "vip" ? " is-active" : "")} onClick={() => setView("vip")}>{t("vipLink")}</button>
-          <button className={"vtc-brand-link" + (view === "contact" ? " is-active" : "")} onClick={() => setView("contact")}>{t("contactLink")}</button>
+      <div className="vtc-brand" onClick={() => setView("home")}>
+        <img src={LOGO_SRC} alt="MBA Premium" className="vtc-brand-mark" />
+        <div className="vtc-brand-text">
+          <span>MBA <em>Premium</em></span>
+          <small>Mindful.Business.Assurance</small>
         </div>
       </div>
       <div className="vtc-topbar-right">
@@ -741,6 +736,11 @@ function TopBar({ view, setView, onDriverSpace, driver, lang, setLang }) {
         </button>
       </div>
     </header>
+    <nav className="vtc-subnav">
+      <button className={"vtc-brand-link vtc-brand-link-gold" + (view === "vip" ? " is-active" : "")} onClick={() => setView("vip")}>{t("vipLink")}</button>
+      <button className={"vtc-brand-link" + (view === "contact" ? " is-active" : "")} onClick={() => setView("contact")}>{t("contactLink")}</button>
+    </nav>
+    </>
   );
 }
 
@@ -1842,12 +1842,12 @@ function ContactPage({ driver, onHome }) {
 function VipPage({ onHome, onSelectRoute }) {
   const { t } = useLang();
   const routes = [
-    { label: t("routeCdg"), pickup: "Aéroport Charles de Gaulle (CDG), Roissy-en-France" },
-    { label: t("routeOrly"), pickup: "Aéroport de Paris-Orly" },
-    { label: t("routeBeauvais"), pickup: "Aéroport de Beauvais-Tillé" },
-    { label: t("routeParis"), pickup: "Paris" },
+    { label: t("routeCdg"), pickup: "Aéroport Paris-Charles de Gaulle, 95700 Roissy-en-France" },
+    { label: t("routeOrly"), pickup: "Aéroport de Paris-Orly, 94390 Orly" },
+    { label: t("routeBeauvais"), pickup: "Aéroport de Paris-Beauvais Tillé, 60000 Tillé" },
+    { label: t("routeParis"), pickup: "Châtelet, 75001 Paris" },
   ];
-  const dropoff = "Disney Village, 2 Av. Paul Séramy, 77700 Chessy";
+  const dropoff = "Disney Village, 2 Avenue Paul Séramy, 77700 Chessy";
 
   return (
     <div className="vtc-panel">
@@ -2100,13 +2100,14 @@ function Style() {
         display: flex; align-items: center; justify-content: space-between;
         padding: 12px 24px; border-bottom: 1px solid var(--vtc-border);
       }
-      .vtc-brand-col { display: flex; flex-direction: column; gap: 4px; }
-      .vtc-brand-links { display: flex; gap: 14px; padding-left: 2px; }
+      .vtc-subnav { display: flex; gap: 20px; padding: 10px 24px; border-bottom: 1px solid var(--vtc-border); }
       .vtc-brand-link {
-        background: none; border: none; color: var(--vtc-text-muted); font-size: 11.5px; font-weight: 600;
+        background: none; border: none; color: var(--vtc-text-muted); font-size: 12.5px; font-weight: 600;
         cursor: pointer; padding: 0; font-family: 'Inter', sans-serif;
       }
       .vtc-brand-link:hover, .vtc-brand-link.is-active { color: var(--vtc-accent); }
+      .vtc-brand-link-gold { color: #C9982E; }
+      .vtc-brand-link-gold:hover, .vtc-brand-link-gold.is-active { color: #A87C1F; }
 
       .vtc-panel-wide { max-width: 860px; }
       .vtc-contact-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; align-items: start; }
