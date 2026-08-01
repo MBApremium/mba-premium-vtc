@@ -196,9 +196,13 @@ function priceFromDistance(distanceKm, durationMin) {
   const priceHT = roundedDistanceKm * 2;
   const tva = priceHT * 0.10;
   const price = priceHT + tva;
+  const durationMinLow = Math.max(1, Math.round(durationMin));
+  const durationMinHigh = Math.round(durationMin * 1.8);
   return {
     distanceKm: roundedDistanceKm,
-    durationMin: Math.round(durationMin),
+    durationMin: durationMinLow,
+    durationMinLow,
+    durationMinHigh,
     priceHT: Math.round(priceHT * 100) / 100,
     tva: Math.round(tva * 100) / 100,
     price: Math.round(price * 100) / 100,
@@ -923,8 +927,9 @@ function Payment({ trip, estimate, courseNumber, driverEmail, onBack, onEmailAtt
           <span>{trip.dropoff}</span>
         </div>
         <div className="vtc-summary-meta">
-          {trip.mode === "now" ? "Départ immédiat" : `Planifiée · ${trip.date} à ${trip.time}`} · {estimate.distanceKm} km · ~{estimate.durationMin} min
+          {trip.mode === "now" ? "Départ immédiat" : `Planifiée · ${trip.date} à ${trip.time}`} · {estimate.distanceKm} km · {estimate.durationMinLow}–{estimate.durationMinHigh} min
         </div>
+        <div className="vtc-summary-meta" style={{ marginTop: 2 }}>Durée variable selon la circulation</div>
         <div className="vtc-summary-price">{formatEUR(estimate.price)}</div>
         {estimate.simulated && (
           <div className="vtc-summary-meta" style={{ marginTop: 6, color: "#B8860B" }}>
@@ -1097,7 +1102,7 @@ function Confirm({ booking, driver, onHome, onViewInvoice }) {
           <span className="vtc-recent-arrow">→</span>
           <span>{booking.dropoff}</span>
         </div>
-        <div className="vtc-summary-meta">{booking.distanceKm} km · ~{booking.durationMin} min · {booking.paymentMethod} · {booking.paymentStatus}</div>
+        <div className="vtc-summary-meta">{booking.distanceKm} km · {booking.durationMinLow}–{booking.durationMinHigh} min · {booking.paymentMethod} · {booking.paymentStatus}</div>
         <div className="vtc-summary-price">{formatEUR(booking.price)}</div>
       </div>
 
