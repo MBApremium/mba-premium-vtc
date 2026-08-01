@@ -226,6 +226,23 @@ async function geocodeAddress(address) {
   return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
 }
 
+// Coordonnées fixes pour les lieux fréquents — évite les échecs de géocodage sur ces trajets
+const KNOWN_LOCATIONS = [
+  { keys: ["disney village", "disneyland", "chessy"], lat: 48.8722, lng: 2.7859 },
+  { keys: ["charles de gaulle", "roissy-en-france", " cdg", "cdg,", "(cdg)"], lat: 49.0097, lng: 2.5479 },
+  { keys: ["paris-orly", "aéroport d'orly", "aeroport d'orly", "94390 orly"], lat: 48.7262, lng: 2.3652 },
+  { keys: ["beauvais"], lat: 49.4544, lng: 2.1128 },
+  { keys: ["châtelet", "chatelet"], lat: 48.8583, lng: 2.3470 },
+];
+
+function findKnownLocation(address) {
+  const a = (address || "").toLowerCase();
+  for (const loc of KNOWN_LOCATIONS) {
+    if (loc.keys.some((k) => a.includes(k))) return { lat: loc.lat, lng: loc.lng };
+  }
+  return null;
+}
+
 // Suggestions d'adresses complètes (numéro, rue, commune, code postal) pendant la saisie
 async function searchAddressSuggestions(queryText) {
   const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&countrycodes=fr&limit=5&q=${encodeURIComponent(queryText)}`;
@@ -258,7 +275,8 @@ async function fetchDrivingRoute(origin, destination) {
 // simulée si les adresses ne sont pas reconnues ou si le service est indisponible.
 async function estimateTrip(pickup, dropoff) {
   try {
-    const [origin, destination] = await Promise.all([geocodeAddress(pickup), geocodeAddress(dropoff)]);
+    const origin = findKnownLocation(pickup) || (await geocodeAddress(pickup));
+    const destination = findKnownLocation(dropoff) || (await geocodeAddress(dropoff));
     if (origin && destination) {
       const route = await fetchDrivingRoute(origin, destination);
       if (route) {
@@ -730,11 +748,11 @@ function TopBar({ view, setView, onDriverSpace, driver, lang, setLang }) {
         <div className="vtc-lang-switch">
           <button className={lang === "fr" ? "is-active" : ""} onClick={() => setLang("fr")}>
             <span>FR</span>
-            <span className="vtc-lang-flag">🇫🇷</span>
+            <FlagFR />
           </button>
           <button className={lang === "en" ? "is-active" : ""} onClick={() => setLang("en")}>
             <span>EN</span>
-            <span className="vtc-lang-flag">🇬🇧</span>
+            <FlagGB />
           </button>
         </div>
       </div>
@@ -747,6 +765,28 @@ function TopBar({ view, setView, onDriverSpace, driver, lang, setLang }) {
       </button>
     </nav>
     </>
+  );
+}
+
+function FlagFR() {
+  return (
+    <svg width="16" height="12" viewBox="0 0 30 20" style={{ borderRadius: 2, display: "block" }}>
+      <rect width="10" height="20" fill="#002395" />
+      <rect x="10" width="10" height="20" fill="#FFFFFF" />
+      <rect x="20" width="10" height="20" fill="#ED2939" />
+    </svg>
+  );
+}
+
+function FlagGB() {
+  return (
+    <svg width="16" height="12" viewBox="0 0 60 40" style={{ borderRadius: 2, display: "block" }}>
+      <rect width="60" height="40" fill="#00247D" />
+      <path d="M0,0 L60,40 M60,0 L0,40" stroke="#FFFFFF" strokeWidth="8" />
+      <path d="M0,0 L60,40 M60,0 L0,40" stroke="#CF142B" strokeWidth="4" />
+      <path d="M30,0 V40 M0,20 H60" stroke="#FFFFFF" strokeWidth="12" />
+      <path d="M30,0 V40 M0,20 H60" stroke="#CF142B" strokeWidth="6" />
+    </svg>
   );
 }
 
@@ -2139,7 +2179,6 @@ function Style() {
         padding: 4px 7px; cursor: pointer; font-family: 'Inter', sans-serif; transition: all .15s;
         display: flex; flex-direction: column; align-items: center; gap: 2px;
       }
-      .vtc-lang-flag { font-size: 12px; line-height: 1; }
       .vtc-lang-switch button.is-active { background: var(--vtc-accent); color: #FFFFFF; }
       .vtc-wheel-btn { width: 30px; height: 30px; border-radius: 50%; background: #0B2A6B; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform .15s; }
       .vtc-wheel-btn svg { stroke: #FFFFFF; }
