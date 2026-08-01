@@ -229,7 +229,12 @@ async function geocodeAddress(address) {
 // Coordonnées fixes pour les lieux fréquents — évite les échecs de géocodage sur ces trajets
 const KNOWN_LOCATIONS = [
   { keys: ["disney village", "disneyland", "chessy", "disney"], lat: 48.8722, lng: 2.7859 },
+  { keys: ["terminal 1", "terminal 1,"], lat: 49.0068, lng: 2.5471, when: ["cdg", "roissy", "charles de gaulle"] },
+  { keys: ["terminal 2", "terminal 2,"], lat: 49.0043, lng: 2.5695, when: ["cdg", "roissy", "charles de gaulle"] },
+  { keys: ["terminal 3", "terminal 3,"], lat: 49.0022, lng: 2.5507, when: ["cdg", "roissy", "charles de gaulle"] },
   { keys: ["charles de gaulle", "roissy-en-france", "roissy", " cdg", "cdg,", "(cdg)", "cdg "], lat: 49.0097, lng: 2.5479 },
+  { keys: ["orly ouest", "orly 1", "orly 2", "orly 3"], lat: 48.7328, lng: 2.3695 },
+  { keys: ["orly sud", "orly 4"], lat: 48.7262, lng: 2.3652 },
   { keys: ["paris-orly", "aéroport d'orly", "aeroport d'orly", "94390 orly", "orly"], lat: 48.7262, lng: 2.3652 },
   { keys: ["beauvais"], lat: 49.4544, lng: 2.1128 },
   { keys: ["châtelet", "chatelet"], lat: 48.8583, lng: 2.3470 },
@@ -238,7 +243,10 @@ const KNOWN_LOCATIONS = [
 function findKnownLocation(address) {
   const a = (address || "").toLowerCase();
   for (const loc of KNOWN_LOCATIONS) {
-    if (loc.keys.some((k) => a.includes(k))) return { lat: loc.lat, lng: loc.lng };
+    const keyMatch = loc.keys.some((k) => a.includes(k));
+    if (!keyMatch) continue;
+    if (loc.when && !loc.when.some((w) => a.includes(w))) continue;
+    return { lat: loc.lat, lng: loc.lng };
   }
   return null;
 }
@@ -249,7 +257,7 @@ async function searchAddressSuggestions(queryText) {
   const res = await fetch(url);
   if (!res.ok) return [];
   const data = await res.json();
-  return data.map((item) => {
+  const results = data.map((item) => {
     const a = item.address || {};
     const streetNum = a.house_number ? a.house_number + " " : "";
     const streetName = a.road || a.pedestrian || a.footway || "";
@@ -259,6 +267,12 @@ async function searchAddressSuggestions(queryText) {
       .filter(Boolean)
       .join(", ");
     return { label: formatted || item.display_name, full: item.display_name };
+  });
+  const seen = new Set();
+  return results.filter((r) => {
+    if (seen.has(r.label)) return false;
+    seen.add(r.label);
+    return true;
   });
 }
 
