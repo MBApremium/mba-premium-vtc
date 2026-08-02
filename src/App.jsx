@@ -1123,7 +1123,13 @@ function Booking({ trip, setTrip, onBack, onNext }) {
           min="1"
           max="8"
           value={trip.passengers}
-          onChange={(e) => setTrip({ ...trip, passengers: Math.max(1, Math.min(8, parseInt(e.target.value, 10) || 1)) })}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "") { setTrip({ ...trip, passengers: "" }); return; }
+            const n = parseInt(v, 10);
+            if (!isNaN(n)) setTrip({ ...trip, passengers: Math.max(1, Math.min(8, n)) });
+          }}
+          onBlur={() => { if (!trip.passengers) setTrip({ ...trip, passengers: 1 }); }}
         />
       </div>
 
