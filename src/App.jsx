@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, createContext, useContext } from "r
 import {
   MapPin, Clock, CreditCard, Car, CheckCircle2, ChevronLeft,
   Calendar, Star, Navigation, Loader2, History, Settings, X, Plus,
-  Plane, Building2, Sparkles, ShoppingBag, Ticket, User
+  Plane, Building2, Sparkles, ShoppingBag, Ticket, User, Search
 } from "lucide-react";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
@@ -320,7 +320,8 @@ function formatEUR(n) {
 // ---------------------------------------------------------------------------
 const STRINGS = {
   fr: {
-    eyebrow: "Réservation en direct",
+    greeting: "Bonjour",
+    whereTo: "Où allez-vous ?",
     heroTitleLine1: "À l'heure, en toute",
     heroTitleLine2: "sécurité. Toujours.",
     heroSub: "Réservez votre chauffeur à l'avance, en toute tranquillité. Prix annoncé avant la course, paiement sécurisé par carte.",
@@ -426,7 +427,8 @@ const STRINGS = {
     trustBeauvaisTag: "Vols low-cost",
   },
   en: {
-    eyebrow: "Live booking",
+    greeting: "Hello",
+    whereTo: "Where to?",
     heroTitleLine1: "On time, always",
     heroTitleLine2: "safe and secure.",
     heroSub: "Book your driver in advance, with total peace of mind. Price shown before the ride, secure card payment.",
@@ -918,13 +920,14 @@ function Home({ driver, onBook, onTrack, bookings }) {
     <div className="vtc-home">
       <section className="vtc-hero">
         <div className="vtc-hero-copy">
-          <span className="vtc-eyebrow">{t("eyebrow")}</span>
+          <span className="vtc-greeting">{t("greeting")}</span>
           <h1>{t("heroTitleLine1")} <br />{t("heroTitleLine2")}</h1>
           <p className="vtc-sub">
             {t("heroSub")}
           </p>
-          <button className="vtc-cta vtc-cta-gold" onClick={onBook}>
-            {t("bookCta")} <Navigation size={16} />
+          <button className="vtc-search-bar" onClick={onBook}>
+            <Search size={18} />
+            <span>{t("whereTo")}</span>
           </button>
 
           <div className="vtc-rating-badge">
@@ -2480,7 +2483,16 @@ function Style() {
       .vtc-hero { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 28px; align-items: center; }
       @media (max-width: 720px) { .vtc-hero { grid-template-columns: 1fr; } }
 
-      .vtc-eyebrow { text-transform: uppercase; letter-spacing: .12em; font-size: 11px; color: var(--vtc-accent); font-weight: 600; }
+      .vtc-greeting { font-size: 14px; color: var(--vtc-text-muted); font-weight: 500; }
+      .vtc-search-bar {
+        display: flex; align-items: center; gap: 12px; width: 100%; max-width: 380px;
+        background: #FFFFFF; border: 1px solid var(--vtc-border); border-radius: 14px; padding: 16px 18px;
+        box-shadow: 0 6px 18px rgba(11,42,74,0.1); cursor: pointer; font-family: 'Inter', sans-serif;
+        color: var(--vtc-text); font-size: 15px; font-weight: 600; text-align: left; margin-top: 8px;
+        transition: box-shadow .15s, transform .15s;
+      }
+      .vtc-search-bar svg { color: var(--vtc-text-muted); flex-shrink: 0; }
+      .vtc-search-bar:hover { box-shadow: 0 8px 22px rgba(11,42,74,0.16); transform: translateY(-1px); }
       .vtc-hero h1 { font-size: 40px; line-height: 1.08; margin: 10px 0 14px; font-weight: 700; }
       .vtc-sub { color: var(--vtc-text-muted); font-size: 14.5px; line-height: 1.55; margin: 0 0 20px; }
 
