@@ -928,13 +928,15 @@ function Home({ driver, onBook, onTrack, bookings }) {
       <section className="vtc-hero">
         <div className="vtc-hero-copy">
           <h1>{t("heroTitleLine1")} <br />{t("heroTitleLine2")}</h1>
+          <button className="vtc-search-bar" onClick={onBook}>
+            <Search size={18} />
+            <span key={showGreeting ? "greeting" : "whereTo"} className="vtc-search-bar-text">
+              {showGreeting ? t("greeting") : t("whereTo")}
+            </span>
+          </button>
           <p className="vtc-sub">
             {t("heroSub")}
           </p>
-          <button className="vtc-search-bar" onClick={onBook}>
-            <Search size={18} />
-            <span>{showGreeting ? t("greeting") : t("whereTo")}</span>
-          </button>
 
           <div className="vtc-rating-badge">
             <span className="vtc-rating-value">{driver.rating.toFixed(1)}</span>
@@ -2489,18 +2491,22 @@ function Style() {
       .vtc-hero { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 28px; align-items: center; }
       @media (max-width: 720px) { .vtc-hero { grid-template-columns: 1fr; } }
 
-      .vtc-greeting { font-size: 14px; color: var(--vtc-text-muted); font-weight: 500; }
       .vtc-search-bar {
-        display: flex; align-items: center; gap: 12px; width: 100%; max-width: 380px;
-        background: #FFFFFF; border: 1px solid var(--vtc-border); border-radius: 14px; padding: 16px 18px;
-        box-shadow: 0 6px 18px rgba(11,42,74,0.1); cursor: pointer; font-family: 'Inter', sans-serif;
-        color: var(--vtc-text); font-size: 15px; font-weight: 600; text-align: left; margin-top: 8px;
+        display: flex; align-items: center; gap: 14px; width: 100%; max-width: 420px;
+        background: #FFFFFF; border: 2px solid #C9982E; border-radius: 16px; padding: 20px 22px;
+        box-shadow: 0 6px 18px rgba(201,152,46,0.18); cursor: pointer; font-family: 'Inter', sans-serif;
+        color: var(--vtc-text); font-size: 16.5px; font-weight: 600; text-align: left; margin-top: 8px;
         transition: box-shadow .15s, transform .15s;
       }
-      .vtc-search-bar svg { color: var(--vtc-text-muted); flex-shrink: 0; }
-      .vtc-search-bar:hover { box-shadow: 0 8px 22px rgba(11,42,74,0.16); transform: translateY(-1px); }
+      .vtc-search-bar svg { color: #C9982E; flex-shrink: 0; }
+      .vtc-search-bar:hover { box-shadow: 0 8px 22px rgba(201,152,46,0.28); transform: translateY(-1px); }
+      .vtc-search-bar-text { display: inline-block; animation: vtc-slide-up 0.45s cubic-bezier(0.22,1,0.36,1); }
+      @keyframes vtc-slide-up {
+        from { transform: translateY(14px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
       .vtc-hero h1 { font-size: 40px; line-height: 1.08; margin: 10px 0 14px; font-weight: 700; }
-      .vtc-sub { color: var(--vtc-text-muted); font-size: 14.5px; line-height: 1.55; margin: 0 0 20px; }
+      .vtc-sub { color: var(--vtc-text-muted); font-size: 14.5px; line-height: 1.55; margin: 16px 0 20px; }
 
       .vtc-cta {
         display: inline-flex; align-items: center; gap: 8px; background: var(--vtc-accent); color: #FFFFFF;
