@@ -2,10 +2,14 @@ import React, { useState, useEffect, useRef, createContext, useContext } from "r
 import {
   MapPin, Clock, CreditCard, Car, CheckCircle2, ChevronLeft,
   Calendar, Star, Navigation, Loader2, History, Settings, X, Plus,
-  Plane, Building2, Sparkles, ShoppingBag, Ticket
+  Plane, Building2, Sparkles, ShoppingBag, Ticket, User
 } from "lucide-react";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import {
+  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  onAuthStateChanged, signOut, updateProfile
+} from "firebase/auth";
 
 // ---------------------------------------------------------------------------
 // Firebase (vraie base de données partagée entre tous les appareils)
@@ -21,6 +25,7 @@ const firebaseConfig = {
 };
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
+const auth = getAuth(firebaseApp);
 
 async function dbGet(key) {
   const snap = await getDoc(doc(db, "app", key));
@@ -358,6 +363,26 @@ const STRINGS = {
     contactInfoResponse: "Temps de réponse",
     contactInfoResponseValue: "Dans les 30 minutes (heures ouvrables)",
     contactWhatsappNote: "Vous préférez WhatsApp ? Envoyez-nous un message directement pour une réponse plus rapide.",
+    accountLink: "Mon compte",
+    accountLoginTitle: "Se connecter",
+    accountSignupTitle: "Créer un compte",
+    accountEmail: "Adresse email",
+    accountPassword: "Mot de passe",
+    accountName: "Nom complet",
+    accountPhone: "Numéro de téléphone",
+    accountLoginBtn: "Se connecter",
+    accountSignupBtn: "Créer mon compte",
+    accountNoAccount: "Pas encore de compte ?",
+    accountHasAccount: "Déjà un compte ?",
+    accountSwitchToSignup: "Créer un compte",
+    accountSwitchToLogin: "Se connecter",
+    accountLogout: "Se déconnecter",
+    accountMyBookings: "Mes réservations",
+    accountNoBookings: "Vous n'avez pas encore de course.",
+    accountProfileTitle: "Mes informations",
+    accountSaveBtn: "Enregistrer",
+    accountSaved: "Enregistré ✅",
+    accountGuestNote: "Vous pouvez réserver sans compte à tout moment — un compte vous permet simplement de retrouver vos courses plus facilement.",
     pickupLabel: "Adresse de départ",
     pickupPlaceholder: "Ex. 12 rue de Paris, Saint-Quentin-en-Yvelines",
     dropoffLabel: "Adresse d'arrivée",
@@ -444,6 +469,26 @@ const STRINGS = {
     contactInfoResponse: "Response time",
     contactInfoResponseValue: "Within 30 minutes (business hours)",
     contactWhatsappNote: "Prefer WhatsApp? Message us directly for a faster reply.",
+    accountLink: "My account",
+    accountLoginTitle: "Log in",
+    accountSignupTitle: "Create an account",
+    accountEmail: "Email address",
+    accountPassword: "Password",
+    accountName: "Full name",
+    accountPhone: "Phone number",
+    accountLoginBtn: "Log in",
+    accountSignupBtn: "Create my account",
+    accountNoAccount: "No account yet?",
+    accountHasAccount: "Already have an account?",
+    accountSwitchToSignup: "Create an account",
+    accountSwitchToLogin: "Log in",
+    accountLogout: "Log out",
+    accountMyBookings: "My bookings",
+    accountNoBookings: "You don't have any rides yet.",
+    accountProfileTitle: "My information",
+    accountSaveBtn: "Save",
+    accountSaved: "Saved ✅",
+    accountGuestNote: "You can always book without an account — having one just makes it easier to find your rides again.",
     pickupLabel: "Pickup address",
     pickupPlaceholder: "E.g. 12 rue de Paris, Saint-Quentin-en-Yvelines",
     dropoffLabel: "Drop-off address",
@@ -512,7 +557,9 @@ const DRIVER_PASSWORD = "Mahdi1234!";
 const WHATSAPP_NUMBER = "33609254801";
 
 export default function App() {
-  const [view, setView] = useState("home"); // home | booking | payment | history | driverspace | track | contact | vip
+  const [view, setView] = useState("home"); // home | booking | payment | history | driverspace | track | contact | vip | account
+  const [currentUser, setCurrentUser] = useState(null); // { uid, email, name, phone } | null
+  const [authLoaded, setAuthLoaded] = useState(false);
   const [lang, setLang] = useState("fr");
   const [driver, setDriver] = useState({ name: "Votre chauffeur", vehicle: "Peugeot 508", plate: "AB-123-CD", rating: 4.9, siret: "", kbis: "", address: "", email: "mbapremiumfr@gmail.com", phone: "+33609254801" });
   const [trip, setTrip] = useState({ pickup: "", dropoff: "", mode: "later", date: "", time: "", clientName: "", clientPhone: "", passengers: 1 });
@@ -555,6 +602,30 @@ export default function App() {
     })();
   }, []);
 
+  // Session client (compte optionnel)
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setCurrentUser(null);
+        setAuthLoaded(true);
+        return;
+      }
+      let profile = { name: user.displayName || "", phone: "" };
+      try {
+        const p = await dbGet(`user-${user.uid}`);
+        if (p) profile = { name: p.name || profile.name, phone: p.phone || "" };
+      } catch (e) {}
+      setCurrentUser({ uid: user.uid, email: user.email, ...profile });
+      setAuthLoaded(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  async function persistUserProfile(uid, profile) {
+    try { await dbSet(`user-${uid}`, profile); } catch (e) {}
+    setCurrentUser((u) => (u ? { ...u, ...profile } : u));
+  }
+
   async function persistDriver(next) {
     setDriver(next);
     try { await dbSet("driver-profile", next); } catch (e) { console.error("Enregistrement du profil impossible :", e); }
@@ -568,6 +639,13 @@ export default function App() {
 
   function goBooking() {
     setEstimate(null);
+    if (currentUser) {
+      setTrip((t) => ({
+        ...t,
+        clientName: t.clientName || currentUser.name || "",
+        clientPhone: t.clientPhone || currentUser.phone || "",
+      }));
+    }
     setView("booking");
   }
 
@@ -596,6 +674,7 @@ export default function App() {
     const record = {
       id: uid(),
       courseNumber: number,
+      uid: currentUser ? currentUser.uid : null,
       pickup: trip.pickup,
       dropoff: trip.dropoff,
       mode: trip.mode,
@@ -604,7 +683,7 @@ export default function App() {
       clientName: trip.clientName,
       clientPhone: trip.clientPhone,
       passengers: trip.passengers,
-      clientEmail: "",
+      clientEmail: currentUser ? currentUser.email : "",
       ...est,
       paymentMethod: "",
       paymentStatus: "Bon de commande émis",
@@ -667,7 +746,7 @@ export default function App() {
     <LangContext.Provider value={{ lang, t }}>
     <div className="vtc-root">
       <Style />
-      <TopBar view={view} setView={setView} onDriverSpace={() => setView("driverspace")} driver={driver} lang={lang} setLang={setLang} />
+      <TopBar view={view} setView={setView} onDriverSpace={() => setView("driverspace")} driver={driver} lang={lang} setLang={setLang} currentUser={currentUser} />
 
       <main className="vtc-main">
         {view === "home" && <Home driver={driver} onBook={goBooking} onTrack={() => setView("track")} bookings={bookings} />}
@@ -701,6 +780,16 @@ export default function App() {
               setTrip((t) => ({ ...t, pickup, dropoff }));
               setView("booking");
             }}
+          />
+        )}
+        {view === "account" && (
+          <AccountPage
+            currentUser={currentUser}
+            bookings={bookings}
+            onHome={() => setView("home")}
+            onSaveProfile={persistUserProfile}
+            onViewInvoice={(b) => setDocTarget({ type: "invoice", booking: b })}
+            onViewOrder={(b) => setDocTarget({ type: "order", booking: b })}
           />
         )}
         {view === "driverspace" && (
@@ -746,7 +835,7 @@ function WhatsAppButton() {
 // ---------------------------------------------------------------------------
 // Top bar
 // ---------------------------------------------------------------------------
-function TopBar({ view, setView, onDriverSpace, driver, lang, setLang }) {
+function TopBar({ view, setView, onDriverSpace, driver, lang, setLang, currentUser }) {
   const { t } = useLang();
   return (
     <>
@@ -769,6 +858,10 @@ function TopBar({ view, setView, onDriverSpace, driver, lang, setLang }) {
             <FlagGB />
           </button>
         </div>
+        <button className="vtc-account-btn" onClick={() => setView("account")} title={t("accountLink")}>
+          <User size={16} />
+          <span>{currentUser ? (currentUser.name || t("accountLink")) : t("accountLink")}</span>
+        </button>
       </div>
     </header>
     <nav className="vtc-subnav">
@@ -1785,6 +1878,153 @@ function ConfirmPaymentTool({ bookings, onHome, onConfirm }) {
 // ---------------------------------------------------------------------------
 // Contact
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Compte client (optionnel) — inscription, connexion, profil, mes réservations
+// ---------------------------------------------------------------------------
+function AccountPage({ currentUser, bookings, onHome, onSaveProfile, onViewInvoice, onViewOrder }) {
+  const { t } = useLang();
+  const [mode, setMode] = useState("login"); // login | signup
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const [profileName, setProfileName] = useState(currentUser ? currentUser.name : "");
+  const [profilePhone, setProfilePhone] = useState(currentUser ? currentUser.phone : "");
+  const [savedFlash, setSavedFlash] = useState(false);
+
+  async function handleAuth() {
+    setBusy(true);
+    setError("");
+    try {
+      if (mode === "signup") {
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        if (name) {
+          try { await updateProfile(cred.user, { displayName: name }); } catch (e) {}
+        }
+        await onSaveProfile(cred.user.uid, { name, phone: "" });
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+    } catch (e) {
+      setError(translateAuthError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveProfile() {
+    if (!currentUser) return;
+    await onSaveProfile(currentUser.uid, { name: profileName, phone: profilePhone });
+    setSavedFlash(true);
+    setTimeout(() => setSavedFlash(false), 2000);
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="vtc-panel">
+        <PanelHeader title={mode === "login" ? t("accountLoginTitle") : t("accountSignupTitle")} onBack={onHome} />
+
+        {mode === "signup" && (
+          <div className="vtc-field">
+            <label>{t("accountName")}</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+        )}
+        <div className="vtc-field">
+          <label>{t("accountEmail")}</label>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </div>
+        <div className="vtc-field">
+          <label>{t("accountPassword")}</label>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        </div>
+
+        {error && <p className="vtc-fineprint" style={{ color: "#c0392b" }}>{error}</p>}
+
+        <button
+          className="vtc-cta vtc-cta-block"
+          disabled={busy || !email.includes("@") || password.length < 6 || (mode === "signup" && !name.trim())}
+          onClick={handleAuth}
+        >
+          {mode === "login" ? t("accountLoginBtn") : t("accountSignupBtn")}
+        </button>
+
+        <p className="vtc-fineprint" style={{ marginTop: 14 }}>
+          {mode === "login" ? t("accountNoAccount") : t("accountHasAccount")}{" "}
+          <button className="vtc-link-btn" style={{ display: "inline", margin: 0 }} onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(""); }}>
+            {mode === "login" ? t("accountSwitchToSignup") : t("accountSwitchToLogin")}
+          </button>
+        </p>
+        <p className="vtc-fineprint">{t("accountGuestNote")}</p>
+      </div>
+    );
+  }
+
+  const myBookings = bookings.filter((b) => b.uid === currentUser.uid);
+
+  return (
+    <div className="vtc-panel">
+      <PanelHeader title={t("accountLink")} onBack={onHome} />
+
+      <div className="vtc-summary" style={{ marginBottom: 20 }}>
+        <div className="vtc-summary-meta">{currentUser.email}</div>
+      </div>
+
+      <h3 style={{ fontSize: 15, marginBottom: 10 }}>{t("accountProfileTitle")}</h3>
+      <div className="vtc-field">
+        <label>{t("accountName")}</label>
+        <input value={profileName} onChange={(e) => setProfileName(e.target.value)} />
+      </div>
+      <div className="vtc-field">
+        <label>{t("accountPhone")}</label>
+        <input type="tel" value={profilePhone} onChange={(e) => setProfilePhone(e.target.value)} />
+      </div>
+      <button className="vtc-cta vtc-cta-block" onClick={saveProfile}>
+        {savedFlash ? t("accountSaved") : t("accountSaveBtn")}
+      </button>
+
+      <h3 style={{ fontSize: 15, margin: "26px 0 10px" }}>{t("accountMyBookings")}</h3>
+      {myBookings.length === 0 && <p className="vtc-fineprint">{t("accountNoBookings")}</p>}
+      <div className="vtc-history-list">
+        {myBookings.map((b) => (
+          <div className="vtc-history-item" key={b.id}>
+            <div>
+              <div className="vtc-summary-row" style={{ marginBottom: 4 }}>
+                <span>{b.pickup}</span>
+                <span className="vtc-recent-arrow">→</span>
+                <span>{b.dropoff}</span>
+              </div>
+              <div className="vtc-summary-meta">
+                {new Date(b.createdAt).toLocaleDateString("fr-FR")} · {b.distanceKm} km · {b.paymentStatus}
+              </div>
+              <button className="vtc-link-btn" style={{ margin: "4px 0 0", textAlign: "left" }} onClick={() => onViewOrder(b)}>
+                N° {b.courseNumber}
+              </button>
+            </div>
+            <span className="vtc-recent-price">{formatEUR(b.price)}</span>
+          </div>
+        ))}
+      </div>
+
+      <button className="vtc-cta vtc-cta-block" style={{ marginTop: 20, background: "var(--vtc-surface)", color: "var(--vtc-text)", border: "1px solid var(--vtc-border)" }} onClick={() => signOut(auth)}>
+        {t("accountLogout")}
+      </button>
+    </div>
+  );
+}
+
+function translateAuthError(e) {
+  const code = e && e.code;
+  if (code === "auth/email-already-in-use") return "Cette adresse email est déjà utilisée.";
+  if (code === "auth/invalid-email") return "Adresse email invalide.";
+  if (code === "auth/weak-password") return "Le mot de passe doit contenir au moins 6 caractères.";
+  if (code === "auth/wrong-password" || code === "auth/invalid-credential") return "Email ou mot de passe incorrect.";
+  if (code === "auth/user-not-found") return "Aucun compte trouvé avec cette adresse email.";
+  return "Une erreur est survenue. Réessayez.";
+}
+
 function ContactPage({ driver, onHome }) {
   const { t } = useLang();
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "", subject: "", message: "" });
@@ -2193,6 +2433,13 @@ function Style() {
       .vtc-brand-text { display: flex; flex-direction: column; line-height: 1.2; }
       .vtc-brand-text small { font-family: 'Inter', sans-serif; font-weight: 500; font-size: 10px; color: var(--vtc-text-muted); letter-spacing: .02em; }
       .vtc-topbar-right { display: flex; align-items: center; gap: 12px; }
+      .vtc-account-btn {
+        display: flex; align-items: center; gap: 6px; background: var(--vtc-surface); border: 1px solid var(--vtc-border);
+        color: var(--vtc-text); font-size: 12px; font-weight: 600; padding: 8px 12px; border-radius: 8px;
+        cursor: pointer; font-family: 'Inter', sans-serif; max-width: 140px;
+      }
+      .vtc-account-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .vtc-account-btn:hover { border-color: var(--vtc-accent); color: var(--vtc-accent); }
       .vtc-lang-switch { display: flex; border: 1px solid var(--vtc-border); border-radius: 8px; overflow: hidden; }
       .vtc-lang-switch button {
         background: var(--vtc-surface); border: none; color: var(--vtc-text-muted); font-size: 10px; font-weight: 600;
