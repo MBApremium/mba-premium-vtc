@@ -916,18 +916,24 @@ function SteeringWheelIcon({ size = 20, color = "#0B2A6B" }) {
 // ---------------------------------------------------------------------------
 function Home({ driver, onBook, onTrack, bookings }) {
   const { t } = useLang();
+  const [showGreeting, setShowGreeting] = useState(true);
+
+  useEffect(() => {
+    const timer = setInterval(() => setShowGreeting((g) => !g), 5000);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <div className="vtc-home">
       <section className="vtc-hero">
         <div className="vtc-hero-copy">
-          <span className="vtc-greeting">{t("greeting")}</span>
           <h1>{t("heroTitleLine1")} <br />{t("heroTitleLine2")}</h1>
           <p className="vtc-sub">
             {t("heroSub")}
           </p>
           <button className="vtc-search-bar" onClick={onBook}>
             <Search size={18} />
-            <span>{t("whereTo")}</span>
+            <span>{showGreeting ? t("greeting") : t("whereTo")}</span>
           </button>
 
           <div className="vtc-rating-badge">
