@@ -858,10 +858,6 @@ function TopBar({ view, setView, onDriverSpace, driver, lang, setLang, currentUs
             <FlagGB />
           </button>
         </div>
-        <button className="vtc-account-btn" onClick={() => setView("account")} title={t("accountLink")}>
-          <User size={16} />
-          <span>{currentUser ? (currentUser.name || t("accountLink")) : t("accountLink")}</span>
-        </button>
       </div>
     </header>
     <nav className="vtc-subnav">
@@ -869,6 +865,10 @@ function TopBar({ view, setView, onDriverSpace, driver, lang, setLang, currentUs
       <button className={"vtc-brand-link" + (view === "contact" ? " is-active" : "")} onClick={() => setView("contact")}>{t("contactLink")}</button>
       <button className="vtc-wheel-btn vtc-wheel-btn-right" onClick={onDriverSpace} title="Espace chauffeur">
         <SteeringWheelIcon size={18} />
+      </button>
+      <button className="vtc-account-btn" onClick={() => setView("account")} title={t("accountLink")}>
+        <User size={16} />
+        <span>{currentUser ? (currentUser.name || t("accountLink")) : t("accountLink")}</span>
       </button>
     </nav>
     </>
@@ -1887,6 +1887,7 @@ function AccountPage({ currentUser, bookings, onHome, onSaveProfile, onViewInvoi
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -1903,7 +1904,7 @@ function AccountPage({ currentUser, bookings, onHome, onSaveProfile, onViewInvoi
         if (name) {
           try { await updateProfile(cred.user, { displayName: name }); } catch (e) {}
         }
-        await onSaveProfile(cred.user.uid, { name, phone: "" });
+        await onSaveProfile(cred.user.uid, { name, phone });
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
@@ -1927,10 +1928,16 @@ function AccountPage({ currentUser, bookings, onHome, onSaveProfile, onViewInvoi
         <PanelHeader title={mode === "login" ? t("accountLoginTitle") : t("accountSignupTitle")} onBack={onHome} />
 
         {mode === "signup" && (
-          <div className="vtc-field">
-            <label>{t("accountName")}</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
+          <>
+            <div className="vtc-field">
+              <label>{t("accountName")}</label>
+              <input value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div className="vtc-field">
+              <label>{t("accountPhone")}</label>
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            </div>
+          </>
         )}
         <div className="vtc-field">
           <label>{t("accountEmail")}</label>
@@ -2434,12 +2441,12 @@ function Style() {
       .vtc-brand-text small { font-family: 'Inter', sans-serif; font-weight: 500; font-size: 10px; color: var(--vtc-text-muted); letter-spacing: .02em; }
       .vtc-topbar-right { display: flex; align-items: center; gap: 12px; }
       .vtc-account-btn {
-        display: flex; align-items: center; gap: 6px; background: var(--vtc-surface); border: 1px solid var(--vtc-border);
-        color: var(--vtc-text); font-size: 12px; font-weight: 600; padding: 8px 12px; border-radius: 8px;
+        display: flex; align-items: center; gap: 6px; background: #0B2A6B; border: 1px solid #0B2A6B;
+        color: #FFFFFF; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px;
         cursor: pointer; font-family: 'Inter', sans-serif; max-width: 140px;
       }
       .vtc-account-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .vtc-account-btn:hover { border-color: var(--vtc-accent); color: var(--vtc-accent); }
+      .vtc-account-btn:hover { background: #0d3384; border-color: #0d3384; color: #FFFFFF; }
       .vtc-lang-switch { display: flex; border: 1px solid var(--vtc-border); border-radius: 8px; overflow: hidden; }
       .vtc-lang-switch button {
         background: var(--vtc-surface); border: none; color: var(--vtc-text-muted); font-size: 10px; font-weight: 600;
