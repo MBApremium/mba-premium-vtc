@@ -919,7 +919,7 @@ function Home({ driver, onBook, onTrack, bookings }) {
   const [showGreeting, setShowGreeting] = useState(true);
 
   useEffect(() => {
-    const timer = setInterval(() => setShowGreeting((g) => !g), 5000);
+    const timer = setInterval(() => setShowGreeting((g) => !g), 3000);
     return () => clearInterval(timer);
   }, []);
 
