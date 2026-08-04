@@ -942,7 +942,6 @@ function Home({ driver, onBook, onTrack, bookings }) {
     <div className="vtc-home">
       <section className="vtc-hero">
         <div className="vtc-hero-copy">
-          <h1>{t("heroTitleLine1")} <br />{t("heroTitleLine2")}</h1>
           <button className="vtc-search-bar" onClick={onBook}>
             <Search size={18} />
             <span key={showGreeting ? "greeting" : "whereTo"} className="vtc-search-bar-text">
