@@ -334,6 +334,7 @@ const STRINGS = {
   fr: {
     greeting: "Bonjour",
     whereTo: "Où allez-vous ?",
+    bookHere: "Réservez votre course ici :)",
     heroTitleLine1: "À l'heure, en toute",
     heroTitleLine2: "sécurité. Toujours.",
     heroSub: "Réservez votre chauffeur à l'avance, en toute tranquillité. Prix annoncé avant la course, paiement sécurisé par carte.",
@@ -441,6 +442,7 @@ const STRINGS = {
   en: {
     greeting: "Hello",
     whereTo: "Where to?",
+    bookHere: "Book your ride here :)",
     heroTitleLine1: "On time, always",
     heroTitleLine2: "safe and secure.",
     heroSub: "Book your driver in advance, with total peace of mind. Price shown before the ride, secure card payment.",
@@ -931,10 +933,11 @@ function SteeringWheelIcon({ size = 20, color = "#0B2A6B" }) {
 // ---------------------------------------------------------------------------
 function Home({ driver, onBook, onTrack, bookings }) {
   const { t } = useLang();
-  const [showGreeting, setShowGreeting] = useState(true);
+  const heroMessages = ["greeting", "whereTo", "bookHere"];
+  const [msgIndex, setMsgIndex] = useState(0);
 
   useEffect(() => {
-    const timer = setInterval(() => setShowGreeting((g) => !g), 3000);
+    const timer = setInterval(() => setMsgIndex((i) => (i + 1) % heroMessages.length), 3000);
     return () => clearInterval(timer);
   }, []);
 
@@ -945,8 +948,8 @@ function Home({ driver, onBook, onTrack, bookings }) {
           <h1>{t("heroTitleLine1")} <br />{t("heroTitleLine2")}</h1>
           <button className="vtc-search-bar" onClick={onBook}>
             <Search size={18} />
-            <span key={showGreeting ? "greeting" : "whereTo"} className="vtc-search-bar-text">
-              {showGreeting ? t("greeting") : t("whereTo")}
+            <span key={heroMessages[msgIndex]} className="vtc-search-bar-text">
+              {t(heroMessages[msgIndex])}
             </span>
           </button>
           <p className="vtc-sub">
