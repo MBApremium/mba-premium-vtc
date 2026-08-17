@@ -555,6 +555,39 @@ function useLang() {
   return useContext(LangContext);
 }
 
+// Données pour la génération de clients fictifs (courses standard, hélées dans la rue)
+const RANDOM_FIRST_NAMES = ["Julien", "Camille", "Sophie", "Nicolas", "Claire", "Antoine", "Marie", "Thomas", "Léa", "Alexandre", "Emma", "Louis", "Chloé", "Hugo", "Manon", "Vincent"];
+const RANDOM_LAST_NAMES = ["Martin", "Bernard", "Dubois", "Thomas", "Robert", "Richard", "Petit", "Durand", "Leroy", "Moreau", "Simon", "Laurent", "Lefebvre", "Michel", "Garcia", "Roux"];
+const PARIS_ADDRESSES = [
+  "12 Rue de Rivoli, 75004 Paris",
+  "25 Avenue des Champs-Élysées, 75008 Paris",
+  "8 Boulevard Saint-Germain, 75005 Paris",
+  "45 Rue du Faubourg Saint-Honoré, 75008 Paris",
+  "3 Place de la Concorde, 75008 Paris",
+  "18 Rue de la Paix, 75002 Paris",
+  "56 Avenue Montaigne, 75008 Paris",
+  "9 Rue de Rennes, 75006 Paris",
+  "30 Rue de la Roquette, 75011 Paris",
+  "14 Rue de Passy, 75016 Paris",
+];
+
+function randomFrom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function randomPhoneNumber() {
+  const prefix = Math.random() < 0.5 ? "06" : "07";
+  let num = prefix;
+  for (let i = 0; i < 4; i++) num += String(Math.floor(Math.random() * 90 + 10));
+  return num;
+}
+
+function randomEmailAddress(firstName, lastName) {
+  const domains = ["gmail.com", "yahoo.fr", "outlook.com", "hotmail.fr"];
+  const suffix = Math.floor(Math.random() * 90 + 10);
+  return `${firstName.toLowerCase()}.${lastName.toLowerCase()}${suffix}@${randomFrom(domains)}`;
+}
+
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
@@ -666,6 +699,48 @@ export default function App() {
       }));
     }
     setView("booking");
+  }
+
+  // Crée une course "standard" (client hélé dans la rue) avec des infos aléatoires,
+  // pour la traçabilité comptable — départ Orly, arrivée choisie à Paris.
+  async function createStandardRide() {
+    const firstName = randomFrom(RANDOM_FIRST_NAMES);
+    const lastName = randomFrom(RANDOM_LAST_NAMES);
+    const clientName = `${firstName} ${lastName}`;
+    const clientPhone = randomPhoneNumber();
+    const clientEmail = randomEmailAddress(firstName, lastName);
+    const pickup = "Aéroport de Paris-Orly, 94390 Orly";
+    const dropoff = randomFrom(PARIS_ADDRESSES);
+
+    const now = new Date();
+    const pickupTime = new Date(now.getTime() - 44 * 60 * 1000);
+    const pad = (n) => String(n).padStart(2, "0");
+    const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const timeStr = `${pad(pickupTime.getHours())}:${pad(pickupTime.getMinutes())}`;
+
+    const est = await estimateTrip(pickup, dropoff);
+    const number = await nextCourseNumber();
+    const record = {
+      id: uid(),
+      courseNumber: number,
+      uid: null,
+      pickup,
+      dropoff,
+      mode: "later",
+      date: dateStr,
+      time: timeStr,
+      clientName,
+      clientPhone,
+      passengers: 1,
+      clientEmail,
+      ...est,
+      paymentMethod: "Espèces",
+      paymentStatus: "Course confirmée",
+      createdAt: now.toISOString(),
+    };
+    const next = [record, ...bookings].slice(0, 60);
+    await persistBookings(next);
+    return record;
   }
 
   async function nextCourseNumber() {
@@ -819,6 +894,7 @@ export default function App() {
             onViewInvoice={(b) => setDocTarget({ type: "invoice", booking: b })}
             onConfirmPayment={confirmCoursePayment}
             onOpenSettings={() => setShowSettings(true)}
+            onCreateStandardRide={createStandardRide}
           />
         )}
       </main>
@@ -1757,7 +1833,7 @@ function Document({ type, booking, driver, onClose }) {
 // ---------------------------------------------------------------------------
 // Espace chauffeur — protégé par mot de passe
 // ---------------------------------------------------------------------------
-function DriverSpace({ bookings, onHome, onViewOrder, onViewInvoice, onConfirmPayment, onOpenSettings }) {
+function DriverSpace({ bookings, onHome, onViewOrder, onViewInvoice, onConfirmPayment, onOpenSettings, onCreateStandardRide }) {
   const [authenticated, setAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
@@ -1811,6 +1887,17 @@ function DriverSpace({ bookings, onHome, onViewOrder, onViewInvoice, onConfirmPa
     return <RegisteredClientsPage onHome={() => setSection("menu")} />;
   }
 
+  if (section === "standardride") {
+    return (
+      <StandardRideTool
+        onHome={() => setSection("menu")}
+        onCreate={onCreateStandardRide}
+        onViewOrder={onViewOrder}
+        onViewInvoice={onViewInvoice}
+      />
+    );
+  }
+
   return (
     <div className="vtc-panel">
       <PanelHeader title="Espace chauffeur" onBack={onHome} />
@@ -1820,6 +1907,9 @@ function DriverSpace({ bookings, onHome, onViewOrder, onViewInvoice, onConfirmPa
         </button>
         <button className="vtc-cta vtc-cta-block" onClick={() => setSection("confirm")}>
           Confirmer un paiement
+        </button>
+        <button className="vtc-cta vtc-cta-block" onClick={() => setSection("standardride")}>
+          Course en cours
         </button>
         <button className="vtc-cta vtc-cta-block" onClick={() => setSection("clients")}>
           Clients inscrits
@@ -1955,6 +2045,68 @@ function RegisteredClientsPage({ onHome }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Course en cours — génère une course standard (client hélé) pour la comptabilité
+// ---------------------------------------------------------------------------
+function StandardRideTool({ onHome, onCreate, onViewOrder, onViewInvoice }) {
+  const [creating, setCreating] = useState(false);
+  const [record, setRecord] = useState(null);
+  const [error, setError] = useState("");
+
+  async function handleCreate() {
+    setCreating(true);
+    setError("");
+    try {
+      const r = await onCreate();
+      setRecord(r);
+    } catch (e) {
+      setError("Une erreur est survenue. Réessayez.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  return (
+    <div className="vtc-panel">
+      <PanelHeader title="Course en cours" onBack={onHome} />
+      <p className="vtc-fineprint" style={{ textAlign: "left", marginBottom: 16 }}>
+        Pour une course standard (client hélé, sans réservation via l'app) : départ Aéroport d'Orly, arrivée à Paris,
+        prise en charge il y a 44 minutes. Les coordonnées du client sont générées automatiquement pour la facturation.
+      </p>
+
+      <button className="vtc-cta vtc-cta-block" disabled={creating} onClick={handleCreate}>
+        {creating ? "Création en cours…" : "Créer une course standard"}
+      </button>
+
+      {error && <p className="vtc-fineprint" style={{ color: "#c0392b", marginTop: 10 }}>{error}</p>}
+
+      {record && (
+        <div className="vtc-summary" style={{ marginTop: 20 }}>
+          <div className="vtc-summary-row">
+            <span>{record.pickup}</span>
+            <span className="vtc-recent-arrow">→</span>
+            <span>{record.dropoff}</span>
+          </div>
+          <div className="vtc-summary-meta">
+            N° {record.courseNumber} · {record.clientName} · {record.clientPhone}
+          </div>
+          <div className="vtc-summary-meta">{record.clientEmail}</div>
+          <div className="vtc-summary-price">{formatEUR(record.price)}</div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14 }}>
+            <button className="vtc-cta vtc-cta-block" onClick={() => onViewOrder(record)}>
+              Voir le bon de commande
+            </button>
+            <button className="vtc-cta vtc-cta-block" onClick={() => onViewInvoice(record)}>
+              Voir la facture
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
