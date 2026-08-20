@@ -1891,25 +1891,9 @@ function DriverSpace({ bookings, onHome, onViewOrder, onViewInvoice, onConfirmPa
   if (section === "standardride") {
     return (
       <StandardRideTool
-        title="Course Orly"
-        description="Pour une course standard (client hélé, sans réservation via l'app) : départ Aéroport d'Orly, arrivée à Paris, prise en charge il y a 44 minutes. Les coordonnées du client sont générées automatiquement pour la facturation."
-        buttonLabel="Course Orly"
         onHome={() => setSection("menu")}
-        onCreate={onCreateStandardRideOrly}
-        onViewOrder={onViewOrder}
-        onViewInvoice={onViewInvoice}
-      />
-    );
-  }
-
-  if (section === "standardrideparis") {
-    return (
-      <StandardRideTool
-        title="Course Paris"
-        description="Pour une course standard (client hélé, sans réservation via l'app) : départ à Paris, arrivée Aéroport d'Orly, prise en charge il y a 44 minutes. Les coordonnées du client sont générées automatiquement pour la facturation."
-        buttonLabel="Course Paris"
-        onHome={() => setSection("menu")}
-        onCreate={onCreateStandardRideParis}
+        onCreateOrly={onCreateStandardRideOrly}
+        onCreateParis={onCreateStandardRideParis}
         onViewOrder={onViewOrder}
         onViewInvoice={onViewInvoice}
       />
@@ -1928,9 +1912,6 @@ function DriverSpace({ bookings, onHome, onViewOrder, onViewInvoice, onConfirmPa
         </button>
         <button className="vtc-cta vtc-cta-block" onClick={() => setSection("standardride")}>
           Course en cours
-        </button>
-        <button className="vtc-cta vtc-cta-block" onClick={() => setSection("standardrideparis")}>
-          Paris
         </button>
         <button className="vtc-cta vtc-cta-block" onClick={() => setSection("clients")}>
           Clients inscrits
@@ -2903,3 +2884,4 @@ function Style() {
     `}</style>
   );
 }
+  
