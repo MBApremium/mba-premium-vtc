@@ -107,7 +107,7 @@ function loadJsPDF() {
   return jsPDFReadyPromise;
 }
 
-async function generateOrderPDFBlob({ courseNumber, clientName, clientPhone, clientEmail, pickup, dropoff, modeLabel, distanceKm, durationMin, priceHT, tva, price, driverKbis, reservedAt }) {
+async function generateOrderPDFBlob({ courseNumber, clientName, clientPhone, clientEmail, pickup, dropoff, distanceKm, durationMin, priceHT, tva, price, driverKbis, reservedAt }) {
   const JsPDFClass = await loadJsPDF();
   const doc = new JsPDFClass();
 
@@ -132,7 +132,6 @@ async function generateOrderPDFBlob({ courseNumber, clientName, clientPhone, cli
   y += 4;
   line(`Départ : ${pickup}`);
   line(`Arrivée : ${dropoff}`);
-  line(modeLabel);
   line(`Distance : ${distanceKm} km`);
   y += 4;
   doc.setFontSize(11);
@@ -1691,7 +1690,7 @@ function Document({ type, booking, driver, onClose }) {
   async function downloadPDF() {
     setDownloading(true);
     try {
-      const modeLabel = booking.mode === "now" ? "Départ immédiat" : `Planifiée le ${booking.date} à ${booking.time}`;
+      const pdfReservedAt = booking.mode === "now" ? docDate : new Date(`${booking.date}T${booking.time}`);
       const blob = isInvoice
         ? await generateInvoicePDFBlob({
             courseNumber: docNumber,
@@ -1711,7 +1710,7 @@ function Document({ type, booking, driver, onClose }) {
             driverSiret: driver.siret,
             driverKbis: driver.kbis,
             driverAddress: driver.address,
-            reservedAt: docDate,
+            reservedAt: pdfReservedAt,
           })
         : await generateOrderPDFBlob({
             courseNumber: docNumber,
@@ -1720,14 +1719,13 @@ function Document({ type, booking, driver, onClose }) {
             clientEmail: booking.clientEmail,
             pickup: booking.pickup,
             dropoff: booking.dropoff,
-            modeLabel,
             distanceKm: booking.distanceKm,
             durationMin: booking.durationMin,
             priceHT: booking.priceHT,
             tva: booking.tva,
             price: booking.price,
             driverKbis: driver.kbis,
-            reservedAt: docDate,
+            reservedAt: pdfReservedAt,
           });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -1760,8 +1758,7 @@ function Document({ type, booking, driver, onClose }) {
           <div className="vtc-doc-head-right">
             <h2>{isInvoice ? "Facture" : "Bon de commande"}</h2>
             <div>N° {docNumber}</div>
-            <div>Réservation effectuée le {docDate.toLocaleDateString("fr-FR")} à {docTime}</div>
-            <div>{booking.mode === "now" ? "Départ immédiat" : `Prise en charge : ${new Date(booking.date).toLocaleDateString("fr-FR")} à ${booking.time}`}</div>
+            <div>{booking.mode === "now" ? `Réservation effectuée le ${docDate.toLocaleDateString("fr-FR")} à ${docTime}` : `Réservation effectuée le ${new Date(booking.date).toLocaleDateString("fr-FR")} à ${booking.time}`}</div>
           </div>
         </div>
 
