@@ -2054,19 +2054,20 @@ function RegisteredClientsPage({ onHome }) {
 // ---------------------------------------------------------------------------
 // Course en cours — génère une course standard (client hélé) pour la comptabilité
 // ---------------------------------------------------------------------------
-function StandardRideTool({ title, description, buttonLabel, onHome, onCreate, onViewOrder, onViewInvoice }) {
+function StandardRideTool({ onHome, onCreateOrly, onCreateParis, onViewOrder, onViewInvoice }) {
   const [creating, setCreating] = useState(false);
   const [record, setRecord] = useState(null);
   const [error, setError] = useState("");
 
-  async function handleCreate() {
+  async function handleCreate(createFn) {
     setCreating(true);
     setError("");
     try {
-      const r = await onCreate();
+      const r = await createFn();
       setRecord(r);
     } catch (e) {
-      setError("Une erreur est survenue. Réessayez.");
+      console.error("Erreur création course standard :", e);
+      setError("Erreur : " + (e && e.message ? e.message : String(e)));
     } finally {
       setCreating(false);
     }
@@ -2074,14 +2075,20 @@ function StandardRideTool({ title, description, buttonLabel, onHome, onCreate, o
 
   return (
     <div className="vtc-panel">
-      <PanelHeader title={title} onBack={onHome} />
+      <PanelHeader title="Course en cours" onBack={onHome} />
       <p className="vtc-fineprint" style={{ textAlign: "left", marginBottom: 16 }}>
-        {description}
+        Pour une course standard (client hélé, sans réservation via l'app), prise en charge il y a 44 minutes.
+        Les coordonnées du client sont générées automatiquement pour la facturation.
       </p>
 
-      <button className="vtc-cta vtc-cta-block" disabled={creating} onClick={handleCreate}>
-        {creating ? "Création en cours…" : buttonLabel}
-      </button>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <button className="vtc-cta vtc-cta-block" disabled={creating} onClick={() => handleCreate(onCreateOrly)}>
+          {creating ? "Création en cours…" : "Course Orly"}
+        </button>
+        <button className="vtc-cta vtc-cta-block" disabled={creating} onClick={() => handleCreate(onCreateParis)}>
+          {creating ? "Création en cours…" : "Course Paris"}
+        </button>
+      </div>
 
       {error && <p className="vtc-fineprint" style={{ color: "#c0392b", marginTop: 10 }}>{error}</p>}
 
