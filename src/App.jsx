@@ -702,14 +702,16 @@ export default function App() {
 
   // Crée une course "standard" (client hélé dans la rue) avec des infos aléatoires,
   // pour la traçabilité comptable — départ Orly, arrivée choisie à Paris.
-  async function createStandardRide() {
+  async function createStandardRide(direction = "orly") {
     const firstName = randomFrom(RANDOM_FIRST_NAMES);
     const lastName = randomFrom(RANDOM_LAST_NAMES);
     const clientName = `${firstName} ${lastName}`;
     const clientPhone = randomPhoneNumber();
     const clientEmail = randomEmailAddress(firstName, lastName);
-    const pickup = "Aéroport de Paris-Orly, 94390 Orly";
-    const dropoff = randomFrom(PARIS_ADDRESSES);
+    const orly = "Aéroport de Paris-Orly, 94390 Orly";
+    const parisAddress = randomFrom(PARIS_ADDRESSES);
+    const pickup = direction === "paris" ? parisAddress : orly;
+    const dropoff = direction === "paris" ? orly : parisAddress;
 
     const now = new Date();
     const pickupTime = new Date(now.getTime() - 44 * 60 * 1000);
@@ -893,7 +895,8 @@ export default function App() {
             onViewInvoice={(b) => setDocTarget({ type: "invoice", booking: b })}
             onConfirmPayment={confirmCoursePayment}
             onOpenSettings={() => setShowSettings(true)}
-            onCreateStandardRide={createStandardRide}
+            onCreateStandardRideOrly={() => createStandardRide("orly")}
+            onCreateStandardRideParis={() => createStandardRide("paris")}
           />
         )}
       </main>
@@ -1831,7 +1834,7 @@ function Document({ type, booking, driver, onClose }) {
 // ---------------------------------------------------------------------------
 // Espace chauffeur — protégé par mot de passe
 // ---------------------------------------------------------------------------
-function DriverSpace({ bookings, onHome, onViewOrder, onViewInvoice, onConfirmPayment, onOpenSettings, onCreateStandardRide }) {
+function DriverSpace({ bookings, onHome, onViewOrder, onViewInvoice, onConfirmPayment, onOpenSettings, onCreateStandardRideOrly, onCreateStandardRideParis }) {
   const [authenticated, setAuthenticated] = useState(false);
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
@@ -1888,8 +1891,25 @@ function DriverSpace({ bookings, onHome, onViewOrder, onViewInvoice, onConfirmPa
   if (section === "standardride") {
     return (
       <StandardRideTool
+        title="Course Orly"
+        description="Pour une course standard (client hélé, sans réservation via l'app) : départ Aéroport d'Orly, arrivée à Paris, prise en charge il y a 44 minutes. Les coordonnées du client sont générées automatiquement pour la facturation."
+        buttonLabel="Course Orly"
         onHome={() => setSection("menu")}
-        onCreate={onCreateStandardRide}
+        onCreate={onCreateStandardRideOrly}
+        onViewOrder={onViewOrder}
+        onViewInvoice={onViewInvoice}
+      />
+    );
+  }
+
+  if (section === "standardrideparis") {
+    return (
+      <StandardRideTool
+        title="Course Paris"
+        description="Pour une course standard (client hélé, sans réservation via l'app) : départ à Paris, arrivée Aéroport d'Orly, prise en charge il y a 44 minutes. Les coordonnées du client sont générées automatiquement pour la facturation."
+        buttonLabel="Course Paris"
+        onHome={() => setSection("menu")}
+        onCreate={onCreateStandardRideParis}
         onViewOrder={onViewOrder}
         onViewInvoice={onViewInvoice}
       />
@@ -1908,6 +1928,9 @@ function DriverSpace({ bookings, onHome, onViewOrder, onViewInvoice, onConfirmPa
         </button>
         <button className="vtc-cta vtc-cta-block" onClick={() => setSection("standardride")}>
           Course en cours
+        </button>
+        <button className="vtc-cta vtc-cta-block" onClick={() => setSection("standardrideparis")}>
+          Paris
         </button>
         <button className="vtc-cta vtc-cta-block" onClick={() => setSection("clients")}>
           Clients inscrits
@@ -2050,7 +2073,7 @@ function RegisteredClientsPage({ onHome }) {
 // ---------------------------------------------------------------------------
 // Course en cours — génère une course standard (client hélé) pour la comptabilité
 // ---------------------------------------------------------------------------
-function StandardRideTool({ onHome, onCreate, onViewOrder, onViewInvoice }) {
+function StandardRideTool({ title, description, buttonLabel, onHome, onCreate, onViewOrder, onViewInvoice }) {
   const [creating, setCreating] = useState(false);
   const [record, setRecord] = useState(null);
   const [error, setError] = useState("");
@@ -2070,14 +2093,13 @@ function StandardRideTool({ onHome, onCreate, onViewOrder, onViewInvoice }) {
 
   return (
     <div className="vtc-panel">
-      <PanelHeader title="Course en cours" onBack={onHome} />
+      <PanelHeader title={title} onBack={onHome} />
       <p className="vtc-fineprint" style={{ textAlign: "left", marginBottom: 16 }}>
-        Pour une course standard (client hélé, sans réservation via l'app) : départ Aéroport d'Orly, arrivée à Paris,
-        prise en charge il y a 44 minutes. Les coordonnées du client sont générées automatiquement pour la facturation.
+        {description}
       </p>
 
       <button className="vtc-cta vtc-cta-block" disabled={creating} onClick={handleCreate}>
-        {creating ? "Création en cours…" : "Course Orly"}
+        {creating ? "Création en cours…" : buttonLabel}
       </button>
 
       {error && <p className="vtc-fineprint" style={{ color: "#c0392b", marginTop: 10 }}>{error}</p>}
