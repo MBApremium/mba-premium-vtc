@@ -609,7 +609,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null); // { uid, email, name, phone } | null
   const [authLoaded, setAuthLoaded] = useState(false);
   const [lang, setLang] = useState("fr");
-  const [driver, setDriver] = useState({ name: "Votre chauffeur", vehicle: "Peugeot 508", plate: "AB-123-CD", rating: 4.9, siret: "", kbis: "", address: "", email: "mbapremiumfr@gmail.com", phone: "+33609254801" });
+  const [driver, setDriver] = useState({ name: "MBA Premium", vehicle: "Peugeot 508", plate: "AB-123-CD", rating: 4.9, siret: "108 048 059 00019", kbis: "", address: "20 Rue Robert Schuman, 91200 ATHIS MONS", email: "mbapremiumfr@gmail.com", phone: "+33609254801" });
   const [trip, setTrip] = useState({ pickup: "", dropoff: "", mode: "later", date: "", time: "", clientName: "", clientPhone: "", passengers: 1 });
   const [estimate, setEstimate] = useState(null);
   const [courseNumber, setCourseNumber] = useState("");
@@ -636,7 +636,17 @@ export default function App() {
     (async () => {
       try {
         const d = await dbGet("driver-profile");
-        if (d) setDriver(d);
+        if (d) {
+          const filled = {
+            ...d,
+            siret: d.siret || "108 048 059 00019",
+            address: d.address || "20 Rue Robert Schuman, 91200 ATHIS MONS",
+          };
+          setDriver(filled);
+          if (!d.siret || !d.address) {
+            try { await dbSet("driver-profile", filled); } catch (e) {}
+          }
+        }
       } catch (e) {
         console.error("Chargement du profil chauffeur impossible :", e);
       }
