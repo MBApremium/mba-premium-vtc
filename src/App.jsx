@@ -1761,6 +1761,7 @@ function Document({ type, booking, driver, onClose }) {
             <h2>{isInvoice ? "Facture" : "Bon de commande"}</h2>
             <div>N° {docNumber}</div>
             <div>Réservation effectuée le {docDate.toLocaleDateString("fr-FR")} à {docTime}</div>
+            <div>{booking.mode === "now" ? "Départ immédiat" : `Prise en charge : ${new Date(booking.date).toLocaleDateString("fr-FR")} à ${booking.time}`}</div>
           </div>
         </div>
 
