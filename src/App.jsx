@@ -2079,7 +2079,7 @@ function StandardRideTool({ onHome, onCreate, onViewOrder, onViewInvoice }) {
       </p>
 
       <button className="vtc-cta vtc-cta-block" disabled={creating} onClick={handleCreate}>
-        {creating ? "Création en cours…" : "Créer une course standard"}
+        {creating ? "Création en cours…" : "Course Orly"}
       </button>
 
       {error && <p className="vtc-fineprint" style={{ color: "#c0392b", marginTop: 10 }}>{error}</p>}
