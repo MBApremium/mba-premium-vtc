@@ -609,7 +609,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null); // { uid, email, name, phone } | null
   const [authLoaded, setAuthLoaded] = useState(false);
   const [lang, setLang] = useState("fr");
-  const [driver, setDriver] = useState({ name: "MBA Premium", vehicle: "Peugeot 508", plate: "AB-123-CD", rating: 4.9, siret: "108 048 059 00019", kbis: "", address: "20 Rue Robert Schuman, 91200 ATHIS MONS", email: "mbapremiumfr@gmail.com", phone: "+33609254801" });
+  const [driver, setDriver] = useState({ name: "MBA Premium", vehicle: "Ford Kuga", plate: "GP-276-AR", rating: 4.9, siret: "108 048 059 00019", kbis: "", address: "20 Rue Robert Schuman, 91200 ATHIS MONS", email: "mbapremiumfr@gmail.com", phone: "+33609254801" });
   const [trip, setTrip] = useState({ pickup: "", dropoff: "", mode: "later", date: "", time: "", clientName: "", clientPhone: "", passengers: 1 });
   const [estimate, setEstimate] = useState(null);
   const [courseNumber, setCourseNumber] = useState("");
@@ -639,11 +639,13 @@ export default function App() {
         if (d) {
           const filled = {
             ...d,
+            vehicle: "Ford Kuga",
+            plate: "GP-276-AR",
             siret: d.siret || "108 048 059 00019",
             address: d.address || "20 Rue Robert Schuman, 91200 ATHIS MONS",
           };
           setDriver(filled);
-          if (!d.siret || !d.address) {
+          if (!d.siret || !d.address || d.vehicle !== "Ford Kuga" || d.plate !== "GP-276-AR") {
             try { await dbSet("driver-profile", filled); } catch (e) {}
           }
         }
@@ -854,7 +856,17 @@ export default function App() {
       <TopBar view={view} setView={setView} onDriverSpace={() => setView("driverspace")} driver={driver} lang={lang} setLang={setLang} currentUser={currentUser} />
 
       <main className="vtc-main">
-        {view === "home" && <Home driver={driver} onBook={goBooking} onTrack={() => setView("track")} bookings={bookings} />}
+        {view === "home" && (
+          <Home
+            driver={driver}
+            onBook={goBooking}
+            onTrack={() => setView("track")}
+            bookings={bookings}
+            trip={trip}
+            setTrip={setTrip}
+            onNext={goToPayment}
+          />
+        )}
         {view === "booking" && (
           <Booking trip={trip} setTrip={setTrip} onBack={() => setView("home")} onNext={goToPayment} />
         )}
@@ -1019,27 +1031,14 @@ function SteeringWheelIcon({ size = 20, color = "#0B2A6B" }) {
 // ---------------------------------------------------------------------------
 // Home / hero with signature route animation
 // ---------------------------------------------------------------------------
-function Home({ driver, onBook, onTrack, bookings }) {
+function Home({ driver, onBook, onTrack, bookings, trip, setTrip, onNext }) {
   const { t } = useLang();
-  const heroMessages = ["greeting", "whereTo", "bookHere"];
-  const [msgIndex, setMsgIndex] = useState(0);
-
-  useEffect(() => {
-    const timer = setInterval(() => setMsgIndex((i) => (i + 1) % heroMessages.length), 3000);
-    return () => clearInterval(timer);
-  }, []);
 
   return (
     <div className="vtc-home">
-      <section className="vtc-hero">
+      <section className="vtc-hero vtc-hero-with-form">
         <div className="vtc-hero-copy">
           <h1>{t("heroTitleLine1")} <br />{t("heroTitleLine2")}</h1>
-          <button className="vtc-search-bar" onClick={onBook}>
-            <Search size={18} />
-            <span key={heroMessages[msgIndex]} className="vtc-search-bar-text">
-              {t(heroMessages[msgIndex])}
-            </span>
-          </button>
           <p className="vtc-sub">
             {t("heroSub")}
           </p>
@@ -1054,7 +1053,7 @@ function Home({ driver, onBook, onTrack, bookings }) {
           </div>
         </div>
 
-        <MapCard />
+        <Booking trip={trip} setTrip={setTrip} onNext={onNext} embedded />
       </section>
 
       <TrustSection t={t} />
@@ -1286,7 +1285,7 @@ function AddressField({ label, icon, placeholder, value, onChange }) {
 // ---------------------------------------------------------------------------
 // Booking form
 // ---------------------------------------------------------------------------
-function Booking({ trip, setTrip, onBack, onNext }) {
+function Booking({ trip, setTrip, onBack, onNext, embedded }) {
   const { t } = useLang();
   const [calculating, setCalculating] = useState(false);
   const now = new Date();
@@ -1303,8 +1302,8 @@ function Booking({ trip, setTrip, onBack, onNext }) {
   const canNext = trip.pickup.trim() && trip.dropoff.trim() && trip.date && trip.time && isTimingValid;
 
   return (
-    <div className="vtc-panel">
-      <PanelHeader title={t("bookingTitle")} onBack={onBack} />
+    <div className={embedded ? "vtc-panel vtc-panel-embedded" : "vtc-panel"}>
+      {!embedded && <PanelHeader title={t("bookingTitle")} onBack={onBack} />}
 
       <div className="vtc-field">
         <label>{t("clientNameLabel")}</label>
@@ -2731,8 +2730,9 @@ function Style() {
 
       .vtc-main { padding: 28px 24px 36px; flex: 1; }
 
-      .vtc-hero { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 28px; align-items: center; }
+      .vtc-hero { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 28px; align-items: start; }
       @media (max-width: 720px) { .vtc-hero { grid-template-columns: 1fr; } }
+      .vtc-panel-embedded { max-width: 100%; margin: 0; padding: 22px; background: #FFFFFF; border: 1px solid var(--vtc-border); border-radius: 16px; box-shadow: 0 10px 30px rgba(11,42,74,0.08); }
 
       .vtc-search-bar {
         display: flex; align-items: center; gap: 14px; width: 100%; max-width: 420px;
