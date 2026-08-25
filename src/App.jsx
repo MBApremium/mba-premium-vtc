@@ -1039,22 +1039,25 @@ function Home({ driver, onBook, onTrack, bookings, trip, setTrip, onNext }) {
       <section className="vtc-hero vtc-hero-with-form">
         <div className="vtc-hero-copy">
           <h1>{t("heroTitleLine1")} <br />{t("heroTitleLine2")}</h1>
-          <p className="vtc-sub">
-            {t("heroSub")}
-          </p>
-
-          <div className="vtc-rating-badge">
-            <span className="vtc-rating-value">{driver.rating.toFixed(1)}</span>
-            <span className="vtc-rating-stars">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star key={i} size={16} className="vtc-star-gold" />
-              ))}
-            </span>
-          </div>
         </div>
 
         <Booking trip={trip} setTrip={setTrip} onNext={onNext} embedded />
       </section>
+
+      <div className="vtc-hero-footer">
+        <p className="vtc-sub">
+          {t("heroSub")}
+        </p>
+
+        <div className="vtc-rating-badge">
+          <span className="vtc-rating-value">{driver.rating.toFixed(1)}</span>
+          <span className="vtc-rating-stars">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Star key={i} size={16} className="vtc-star-gold" />
+            ))}
+          </span>
+        </div>
+      </div>
 
       <TrustSection t={t} />
     </div>
@@ -2733,6 +2736,8 @@ function Style() {
       .vtc-hero { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 28px; align-items: start; }
       @media (max-width: 720px) { .vtc-hero { grid-template-columns: 1fr; } }
       .vtc-panel-embedded { max-width: 100%; margin: 0; padding: 22px; background: #FFFFFF; border: 1px solid var(--vtc-border); border-radius: 16px; box-shadow: 0 10px 30px rgba(11,42,74,0.08); }
+      .vtc-hero-footer { margin-top: 28px; }
+      .vtc-hero-footer .vtc-sub { max-width: 480px; }
 
       .vtc-search-bar {
         display: flex; align-items: center; gap: 14px; width: 100%; max-width: 420px;
