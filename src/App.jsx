@@ -1371,43 +1371,14 @@ function Booking({ trip, setTrip, onBack, onNext, embedded }) {
     <div className={embedded ? "vtc-panel vtc-panel-embedded" : "vtc-panel"}>
       {!embedded && <PanelHeader title={t("bookingTitle")} onBack={onBack} />}
 
-      <div className="vtc-field-row vtc-field-row-desktop">
-        <div className="vtc-field">
-          <label>{t("clientNameLabel")}</label>
-          <input
-            type="text"
-            placeholder={t("clientNamePlaceholder")}
-            value={trip.clientName}
-            onChange={(e) => setTrip({ ...trip, clientName: e.target.value })}
-          />
-        </div>
-
-        <div className="vtc-field">
-          <label>{t("phoneLabel")}</label>
-          <input
-            type="tel"
-            placeholder={t("phonePlaceholder")}
-            value={trip.clientPhone}
-            onChange={(e) => setTrip({ ...trip, clientPhone: e.target.value })}
-          />
-        </div>
-
-        <div className="vtc-field vtc-field-narrow">
-          <label>{t("passengersLabel")}</label>
-          <input
-            type="number"
-            min="1"
-            max="8"
-            value={trip.passengers}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v === "") { setTrip({ ...trip, passengers: "" }); return; }
-              const n = parseInt(v, 10);
-              if (!isNaN(n)) setTrip({ ...trip, passengers: Math.max(1, Math.min(8, n)) });
-            }}
-            onBlur={() => { if (!trip.passengers) setTrip({ ...trip, passengers: 1 }); }}
-          />
-        </div>
+      <div className="vtc-field">
+        <label>{t("clientNameLabel")}</label>
+        <input
+          type="text"
+          placeholder={t("clientNamePlaceholder")}
+          value={trip.clientName}
+          onChange={(e) => setTrip({ ...trip, clientName: e.target.value })}
+        />
       </div>
 
       <AddressField
@@ -1425,6 +1396,33 @@ function Booking({ trip, setTrip, onBack, onNext, embedded }) {
         value={trip.dropoff}
         onChange={(v) => setTrip({ ...trip, dropoff: v })}
       />
+
+      <div className="vtc-field">
+        <label>{t("phoneLabel")}</label>
+        <input
+          type="tel"
+          placeholder={t("phonePlaceholder")}
+          value={trip.clientPhone}
+          onChange={(e) => setTrip({ ...trip, clientPhone: e.target.value })}
+        />
+      </div>
+
+      <div className="vtc-field">
+        <label>{t("passengersLabel")}</label>
+        <input
+          type="number"
+          min="1"
+          max="8"
+          value={trip.passengers}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "") { setTrip({ ...trip, passengers: "" }); return; }
+            const n = parseInt(v, 10);
+            if (!isNaN(n)) setTrip({ ...trip, passengers: Math.max(1, Math.min(8, n)) });
+          }}
+          onBlur={() => { if (!trip.passengers) setTrip({ ...trip, passengers: 1 }); }}
+        />
+      </div>
 
       <div className="vtc-field">
         <label><Clock size={14} /> {t("pickupTimeLabel")}</label>
@@ -2779,7 +2777,6 @@ function Style() {
       .vtc-brand-link-gold:hover, .vtc-brand-link-gold.is-active { background: #F5E3B8; border-color: #A87C1F; color: #14100A; }
 
       .vtc-panel-wide { max-width: 860px; }
-      @media (min-width: 1180px) { .vtc-panel-wide { max-width: 980px; } }
       .vtc-contact-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; align-items: start; }
       @media (max-width: 720px) { .vtc-contact-grid { grid-template-columns: 1fr; } }
       .vtc-contact-form textarea, .vtc-contact-form select {
@@ -2832,8 +2829,7 @@ function Style() {
       }
       .vtc-navbtn:hover, .vtc-navbtn.is-active { color: var(--vtc-text); border-color: var(--vtc-accent); }
 
-      .vtc-main { padding: 28px 40px 36px; flex: 1; max-width: 1240px; margin: 0 auto; width: 100%; box-sizing: border-box; }
-      @media (max-width: 720px) { .vtc-main { padding: 20px 16px 28px; } }
+      .vtc-main { padding: 28px 24px 36px; flex: 1; }
 
       .vtc-hero { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 28px; align-items: start; }
       @media (max-width: 720px) { .vtc-hero { grid-template-columns: 1fr; } }
@@ -2918,8 +2914,6 @@ function Style() {
       .vtc-recent-price { font-family: 'IBM Plex Mono', monospace; color: var(--vtc-accent-2); font-size: 13.5px; }
 
       .vtc-panel { max-width: 480px; margin: 0 auto; }
-      @media (min-width: 860px) { .vtc-panel { max-width: 620px; } }
-      @media (min-width: 1180px) { .vtc-panel { max-width: 700px; } }
       .vtc-panel-head { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
       .vtc-icon-btn { background: var(--vtc-surface); border: 1px solid var(--vtc-border); color: var(--vtc-text); width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 
@@ -2931,12 +2925,6 @@ function Style() {
       }
       .vtc-field input:focus { border-color: var(--vtc-accent); }
       .vtc-field-row { display: flex; gap: 12px; }
-      .vtc-field-row-desktop { flex-direction: column; }
-      .vtc-field-narrow { flex: 0 0 auto; width: 100%; }
-      @media (min-width: 640px) {
-        .vtc-field-row-desktop { flex-direction: row; }
-        .vtc-field-row-desktop .vtc-field-narrow { width: 110px; }
-      }
       .vtc-field-row .vtc-field { flex: 1; }
 
       .vtc-address-field { position: relative; }
