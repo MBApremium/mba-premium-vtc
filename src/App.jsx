@@ -126,7 +126,7 @@ function loadJsPDF() {
   return jsPDFReadyPromise;
 }
 
-async function generateOrderPDFBlob({ courseNumber, clientName, clientPhone, clientEmail, pickup, dropoff, distanceKm, durationMin, priceHT, tva, price, driverKbis, driverVehicle, driverPlate, reservedAt }) {
+async function generateOrderPDFBlob({ courseNumber, clientName, clientPhone, clientEmail, pickup, dropoff, distanceKm, durationMin, priceHT, tva, price, driverSiret, driverKbis, driverVehicle, driverPlate, reservedAt }) {
   const JsPDFClass = await loadJsPDF();
   const doc = new JsPDFClass();
 
@@ -144,6 +144,7 @@ async function generateOrderPDFBlob({ courseNumber, clientName, clientPhone, cli
   let y = 75;
   const line = (txt) => { doc.text(txt, 20, y); y += 8; };
   line(`Société : MBA Premium`);
+  if (driverSiret) line(`SIRET : ${driverSiret}`);
   if (driverKbis) line(`Kbis n° ${driverKbis}`);
   if (driverVehicle || driverPlate) line(`Véhicule : ${driverVehicle || ""}${driverPlate ? " · " + driverPlate : ""}`);
   line(`Client : ${clientName || "(non renseigné)"}`);
@@ -1803,6 +1804,7 @@ function Document({ type, booking, driver, onClose }) {
             priceHT: booking.priceHT,
             tva: booking.tva,
             price: booking.price,
+            driverSiret: driver.siret,
             driverKbis: driver.kbis,
             driverVehicle: driver.vehicle,
             driverPlate: driver.plate,
