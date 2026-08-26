@@ -126,7 +126,7 @@ function loadJsPDF() {
   return jsPDFReadyPromise;
 }
 
-async function generateOrderPDFBlob({ courseNumber, clientName, clientPhone, clientEmail, pickup, dropoff, distanceKm, durationMin, priceHT, tva, price, driverKbis, reservedAt }) {
+async function generateOrderPDFBlob({ courseNumber, clientName, clientPhone, clientEmail, pickup, dropoff, distanceKm, durationMin, priceHT, tva, price, driverKbis, driverVehicle, driverPlate, reservedAt }) {
   const JsPDFClass = await loadJsPDF();
   const doc = new JsPDFClass();
 
@@ -145,6 +145,7 @@ async function generateOrderPDFBlob({ courseNumber, clientName, clientPhone, cli
   const line = (txt) => { doc.text(txt, 20, y); y += 8; };
   line(`Société : MBA Premium`);
   if (driverKbis) line(`Kbis n° ${driverKbis}`);
+  if (driverVehicle || driverPlate) line(`Véhicule : ${driverVehicle || ""}${driverPlate ? " · " + driverPlate : ""}`);
   line(`Client : ${clientName || "(non renseigné)"}`);
   if (clientPhone) line(`Téléphone : ${clientPhone}`);
   line(`Email du client : ${clientEmail}`);
@@ -167,7 +168,7 @@ async function generateOrderPDFBlob({ courseNumber, clientName, clientPhone, cli
   return doc.output("blob");
 }
 
-async function generateInvoicePDFBlob({ courseNumber, clientName, clientPhone, clientEmail, pickup, dropoff, distanceKm, durationMin, priceHT, tva, price, paymentMethod, paymentStatus, driverName, driverSiret, driverKbis, driverAddress, reservedAt }) {
+async function generateInvoicePDFBlob({ courseNumber, clientName, clientPhone, clientEmail, pickup, dropoff, distanceKm, durationMin, priceHT, tva, price, paymentMethod, paymentStatus, driverName, driverSiret, driverKbis, driverAddress, driverVehicle, driverPlate, reservedAt }) {
   const JsPDFClass = await loadJsPDF();
   const doc = new JsPDFClass();
 
@@ -189,6 +190,7 @@ async function generateInvoicePDFBlob({ courseNumber, clientName, clientPhone, c
   if (driverAddress) line(driverAddress);
   if (driverSiret) line(`SIRET : ${driverSiret}`);
   if (driverKbis) line(`Kbis n° ${driverKbis}`);
+  if (driverVehicle || driverPlate) line(`Véhicule : ${driverVehicle || ""}${driverPlate ? " · " + driverPlate : ""}`);
   y += 4;
   line(`Client : ${clientName || "(non renseigné)"}`);
   if (clientPhone) line(`Téléphone : ${clientPhone}`);
@@ -1785,6 +1787,8 @@ function Document({ type, booking, driver, onClose }) {
             driverSiret: driver.siret,
             driverKbis: driver.kbis,
             driverAddress: driver.address,
+            driverVehicle: driver.vehicle,
+            driverPlate: driver.plate,
             reservedAt: pdfReservedAt,
           })
         : await generateOrderPDFBlob({
@@ -1800,6 +1804,8 @@ function Document({ type, booking, driver, onClose }) {
             tva: booking.tva,
             price: booking.price,
             driverKbis: driver.kbis,
+            driverVehicle: driver.vehicle,
+            driverPlate: driver.plate,
             reservedAt: pdfReservedAt,
           });
       const url = URL.createObjectURL(blob);
