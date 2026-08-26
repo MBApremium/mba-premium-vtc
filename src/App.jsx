@@ -36,6 +36,25 @@ async function dbSet(key, data) {
   await setDoc(doc(db, "app", key), data);
 }
 
+// Une vraie collection Firestore : une fiche par course (au lieu d'un seul gros document partagé)
+async function dbGetBooking(courseNumber) {
+  const snap = await getDoc(doc(db, "bookings", courseNumber));
+  return snap.exists() ? snap.data() : null;
+}
+
+async function dbSetBooking(courseNumber, data) {
+  await setDoc(doc(db, "bookings", courseNumber), data);
+}
+
+// Réservé au chauffeur connecté (règles Firestore) : liste toutes les courses
+async function dbListAllBookings() {
+  const snap = await getDocs(collection(db, "bookings"));
+  const list = [];
+  snap.forEach((d) => list.push(d.data()));
+  list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return list;
+}
+
 // Liste tous les clients inscrits (comptes créés avec email/mot de passe)
 async function dbListRegisteredClients() {
   const snap = await getDocs(collection(db, "app"));
@@ -601,7 +620,7 @@ function normalizeCourseNumber(s) {
     .replace(/\s+/g, "");
 }
 
-const DRIVER_PASSWORD = "Mahdi1234!";
+const DRIVER_EMAIL = "mbapremiumfr@gmail.com";
 const WHATSAPP_NUMBER = "33609254801";
 
 export default function App() {
@@ -652,12 +671,6 @@ export default function App() {
       } catch (e) {
         console.error("Chargement du profil chauffeur impossible :", e);
       }
-      try {
-        const b = await dbGet("bookings");
-        if (b && Array.isArray(b.list)) setBookings(b.list);
-      } catch (e) {
-        console.error("Chargement des réservations impossible :", e);
-      }
       setLoaded(true);
     })();
   }, []);
@@ -689,15 +702,45 @@ export default function App() {
     setCurrentUser((u) => (u ? { ...u, ...profile } : u));
   }
 
+  // Récupère les courses d'un client connecté, même créées lors d'une session précédente
+  async function loadMyBookings(uidVal) {
+    try {
+      const p = await dbGet(`user-${uidVal}`);
+      const numbers = p && Array.isArray(p.myBookings) ? p.myBookings : [];
+      const results = await Promise.all(numbers.map((n) => dbGetBooking(n).catch(() => null)));
+      return results.filter(Boolean).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    } catch (e) {
+      console.error("Chargement de mes réservations impossible :", e);
+      return [];
+    }
+  }
+
   async function persistDriver(next) {
     setDriver(next);
     try { await dbSet("driver-profile", next); } catch (e) { console.error("Enregistrement du profil impossible :", e); }
   }
 
-  async function persistBookings(next) {
-    setBookings(next);
-    try { await dbSet("bookings", { list: next }); } catch (e) { console.error("Enregistrement des réservations impossible :", e); }
-    return next;
+  // Réservé à l'espace chauffeur (connecté) : charge toutes les courses
+  async function loadAllBookingsForDriver() {
+    try {
+      const list = await dbListAllBookings();
+      setBookings(list);
+    } catch (e) {
+      console.error("Chargement des réservations impossible (accès chauffeur requis) :", e);
+    }
+  }
+
+  // Ajoute ou met à jour UNE course dans l'état local + Firestore (pas tout le reste)
+  async function upsertLocalBooking(record) {
+    setBookings((prev) => {
+      const idx = prev.findIndex((b) => b.courseNumber === record.courseNumber);
+      if (idx === -1) return [record, ...prev];
+      const next = [...prev];
+      next[idx] = record;
+      return next;
+    });
+    try { await dbSetBooking(record.courseNumber, record); } catch (e) { console.error("Enregistrement de la course impossible :", e); }
+    return record;
   }
 
   function goBooking() {
@@ -751,8 +794,7 @@ export default function App() {
       paymentStatus: "Course confirmée",
       createdAt: now.toISOString(),
     };
-    const next = [record, ...bookings].slice(0, 60);
-    await persistBookings(next);
+    await upsertLocalBooking(record);
     return record;
   }
 
@@ -796,8 +838,16 @@ export default function App() {
       paymentStatus: "Bon de commande émis",
       createdAt: new Date().toISOString(),
     };
-    const next = [record, ...bookings].slice(0, 60);
-    await persistBookings(next);
+    await upsertLocalBooking(record);
+    if (currentUser) {
+      try {
+        const p = (await dbGet(`user-${currentUser.uid}`)) || {};
+        const myBookings = Array.isArray(p.myBookings) ? p.myBookings : [];
+        await dbSet(`user-${currentUser.uid}`, { ...p, myBookings: [...myBookings, number] });
+      } catch (e) {
+        console.error("Association de la course au compte impossible :", e);
+      }
+    }
     setEstimate(est);
     setCourseNumber(number);
     setCurrentRecordId(record.id);
@@ -806,22 +856,30 @@ export default function App() {
 
   // Enregistre l'email du client saisi une fois le bon de commande envoyé
   async function attachClientEmail(clientEmail) {
-    const next = bookings.map((b) => (b.id === currentRecordId ? { ...b, clientEmail } : b));
-    await persistBookings(next);
+    try {
+      const current = await dbGetBooking(courseNumber);
+      if (current) await upsertLocalBooking({ ...current, clientEmail });
+    } catch (e) {
+      console.error("Enregistrement de l'email impossible :", e);
+    }
   }
 
-  // Appelé depuis l'espace chauffeur (protégé par mot de passe) pour confirmer un paiement
+  // Appelé depuis l'espace chauffeur (connecté) pour confirmer un paiement
   async function confirmCoursePayment(number) {
-    const idx = bookings.findIndex((b) => (b.courseNumber || "").toLowerCase() === number.trim().toLowerCase());
-    if (idx === -1) return false;
+    const cleanNumber = number.trim();
+    let record;
+    try {
+      record = await dbGetBooking(cleanNumber);
+    } catch (e) {
+      return false;
+    }
+    if (!record) return false;
     const updated = {
-      ...bookings[idx],
+      ...record,
       paymentStatus: "Course confirmée",
-      paymentMethod: bookings[idx].paymentMethod || "Carte bancaire (SumUp)",
+      paymentMethod: record.paymentMethod || "Carte bancaire (SumUp)",
     };
-    const next = [...bookings];
-    next[idx] = updated;
-    await persistBookings(next);
+    await upsertLocalBooking(updated);
 
     try {
       if (updated.clientEmail) {
@@ -888,7 +946,7 @@ export default function App() {
             onViewInvoice={(b) => setDocTarget({ type: "invoice", booking: b })}
           />
         )}
-        {view === "track" && <TrackStatus bookings={bookings} onHome={() => setView("home")} />}
+        {view === "track" && <TrackStatus onHome={() => setView("home")} />}
         {view === "contact" && <ContactPage driver={driver} onHome={() => setView("home")} />}
         {view === "vip" && (
           <VipPage
@@ -902,9 +960,9 @@ export default function App() {
         {view === "account" && (
           <AccountPage
             currentUser={currentUser}
-            bookings={bookings}
             onHome={() => setView("home")}
             onSaveProfile={persistUserProfile}
+            onLoadMyBookings={loadMyBookings}
             onViewInvoice={(b) => setDocTarget({ type: "invoice", booking: b })}
             onViewOrder={(b) => setDocTarget({ type: "order", booking: b })}
           />
@@ -912,6 +970,7 @@ export default function App() {
         {view === "driverspace" && (
           <DriverSpace
             bookings={bookings}
+            currentUser={currentUser}
             onHome={() => setView("home")}
             onViewOrder={(b) => setDocTarget({ type: "order", booking: b })}
             onViewInvoice={(b) => setDocTarget({ type: "invoice", booking: b })}
@@ -919,6 +978,7 @@ export default function App() {
             onOpenSettings={() => setShowSettings(true)}
             onCreateStandardRideOrly={() => createStandardRide("orly")}
             onCreateStandardRideParis={() => createStandardRide("paris")}
+            onLoadAllBookings={loadAllBookingsForDriver}
           />
         )}
       </main>
@@ -1846,27 +1906,35 @@ function Document({ type, booking, driver, onClose }) {
 // ---------------------------------------------------------------------------
 // Espace chauffeur — protégé par mot de passe
 // ---------------------------------------------------------------------------
-function DriverSpace({ bookings, onHome, onViewOrder, onViewInvoice, onConfirmPayment, onOpenSettings, onCreateStandardRideOrly, onCreateStandardRideParis }) {
-  const [authenticated, setAuthenticated] = useState(false);
+function DriverSpace({ bookings, currentUser, onHome, onViewOrder, onViewInvoice, onConfirmPayment, onOpenSettings, onCreateStandardRideOrly, onCreateStandardRideParis, onLoadAllBookings }) {
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
+  const [signingIn, setSigningIn] = useState(false);
   const [section, setSection] = useState("menu"); // menu | documents | confirm
+  const isDriver = currentUser && currentUser.email === DRIVER_EMAIL;
 
-  function tryLogin() {
-    if (password === DRIVER_PASSWORD) {
-      setAuthenticated(true);
-      setAuthError("");
-    } else {
+  useEffect(() => {
+    if (isDriver) onLoadAllBookings();
+  }, [isDriver]);
+
+  async function tryLogin() {
+    setSigningIn(true);
+    setAuthError("");
+    try {
+      await signInWithEmailAndPassword(auth, DRIVER_EMAIL, password);
+    } catch (e) {
       setAuthError("Mot de passe incorrect.");
+    } finally {
+      setSigningIn(false);
     }
   }
 
-  if (!authenticated) {
+  if (!isDriver) {
     return (
       <div className="vtc-panel">
         <PanelHeader title="Espace chauffeur" onBack={onHome} />
         <div className="vtc-field">
-          <label>Mot de passe</label>
+          <label>Mot de passe du compte chauffeur</label>
           <input
             type="password"
             placeholder="••••••••"
@@ -1876,7 +1944,9 @@ function DriverSpace({ bookings, onHome, onViewOrder, onViewInvoice, onConfirmPa
           />
         </div>
         {authError && <p className="vtc-fineprint" style={{ color: "#c0392b" }}>{authError}</p>}
-        <button className="vtc-cta vtc-cta-block" onClick={tryLogin}>Entrer</button>
+        <button className="vtc-cta vtc-cta-block" disabled={signingIn} onClick={tryLogin}>
+          {signingIn ? "Connexion…" : "Entrer"}
+        </button>
       </div>
     );
   }
@@ -2137,7 +2207,7 @@ function StandardRideTool({ onHome, onCreateOrly, onCreateParis, onViewOrder, on
 // ---------------------------------------------------------------------------
 // Compte client (optionnel) — inscription, connexion, profil, mes réservations
 // ---------------------------------------------------------------------------
-function AccountPage({ currentUser, bookings, onHome, onSaveProfile, onViewInvoice, onViewOrder }) {
+function AccountPage({ currentUser, onHome, onSaveProfile, onLoadMyBookings, onViewInvoice, onViewOrder }) {
   const { t } = useLang();
   const [mode, setMode] = useState("login"); // login | signup
   const [email, setEmail] = useState("");
@@ -2225,7 +2295,17 @@ function AccountPage({ currentUser, bookings, onHome, onSaveProfile, onViewInvoi
     );
   }
 
-  const myBookings = bookings.filter((b) => b.uid === currentUser.uid);
+  const [myBookings, setMyBookings] = useState([]);
+  const [loadingBookings, setLoadingBookings] = useState(true);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    setLoadingBookings(true);
+    onLoadMyBookings(currentUser.uid).then((list) => {
+      setMyBookings(list);
+      setLoadingBookings(false);
+    });
+  }, [currentUser && currentUser.uid]);
 
   return (
     <div className="vtc-panel">
@@ -2249,7 +2329,8 @@ function AccountPage({ currentUser, bookings, onHome, onSaveProfile, onViewInvoi
       </button>
 
       <h3 style={{ fontSize: 15, margin: "26px 0 10px" }}>{t("accountMyBookings")}</h3>
-      {myBookings.length === 0 && <p className="vtc-fineprint">{t("accountNoBookings")}</p>}
+      {loadingBookings && <p className="vtc-fineprint">Chargement…</p>}
+      {!loadingBookings && myBookings.length === 0 && <p className="vtc-fineprint">{t("accountNoBookings")}</p>}
       <div className="vtc-history-list">
         {myBookings.map((b) => (
           <div className="vtc-history-item" key={b.id}>
@@ -2440,15 +2521,24 @@ function VipPage({ onHome, onSelectRoute }) {
 // ---------------------------------------------------------------------------
 // TrackStatus — le client suit sa réservation avec son numéro de course
 // ---------------------------------------------------------------------------
-function TrackStatus({ bookings, onHome }) {
+function TrackStatus({ onHome }) {
   const [query, setQuery] = useState("");
   const [searched, setSearched] = useState(false);
   const [result, setResult] = useState(null);
+  const [searching, setSearching] = useState(false);
 
-  function search() {
-    const q = normalizeCourseNumber(query);
-    setResult(bookings.find((b) => normalizeCourseNumber(b.courseNumber) === q) || null);
-    setSearched(true);
+  async function search() {
+    setSearching(true);
+    try {
+      const q = normalizeCourseNumber(query);
+      const found = await dbGetBooking(q);
+      setResult(found);
+    } catch (e) {
+      setResult(null);
+    } finally {
+      setSearched(true);
+      setSearching(false);
+    }
   }
 
   const isConfirmed = result && result.paymentStatus === "Course confirmée";
@@ -2468,8 +2558,8 @@ function TrackStatus({ bookings, onHome }) {
         />
       </div>
 
-      <button className="vtc-cta vtc-cta-block" disabled={!query.trim()} onClick={search}>
-        Rechercher
+      <button className="vtc-cta vtc-cta-block" disabled={!query.trim() || searching} onClick={search}>
+        {searching ? "Recherche…" : "Rechercher"}
       </button>
 
       {searched && !result && (
